@@ -9,7 +9,7 @@ I created a miniature logging framework to satisfy my immediate needs:
 
 Non-goals:
 - Do everything (loading config from various sources, have rolling file appenders, etc)
-- Become baggage-laden (dependencies on everything on out there)
+- Become baggage-laden (dependencies on everything else out there)
 
 These are early days, and the feature set may grow, bugs will be found and fixed.
 
@@ -29,7 +29,7 @@ zig fetch --save https://github.com/hissyfit-dev/hissylogz/archive/refs/tags/v0.
 Add dependency import in `build.zig`:
 
 ```zig
-    const hissylogz = b.dependency("datetime", .{
+    const hissylogz = b.dependency("hissylogz", .{
         .target = target,
         .optimize = optimize,
     });
