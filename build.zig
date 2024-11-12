@@ -23,6 +23,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/hissylogz.zig"),
         .target = target,
         .optimize = optimize,
+        .imports = &.{.{ .name = "datetime", .module = datetime.module("datetime") }},
     });
 
     const exe = b.addExecutable(.{
