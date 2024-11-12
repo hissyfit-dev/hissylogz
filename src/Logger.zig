@@ -313,7 +313,7 @@ pub const LogEntry = struct {
         switch (self.appender) {
             .noop => {},
             .json => |*jctx| jctx.json_appender.formatted(key, format, values),
-            .text => |*tctx| tctx.text_appender.formatted(key, values),
+            .text => |*tctx| tctx.text_appender.formatted(key, format, values),
         }
         return self;
     }
