@@ -37,10 +37,12 @@ pub fn main() !void {
 
 fn useGlobalLoggerPool() void {
     var logger = hissylogz.globalLoggerPool().logger("useGlobalLoggerPool");
-    logger.debug().src(@src()).str("first", "Hidden entry").int("entry#", 1).boolean("appears", false).log();
-    logger.info().src(@src()).str("second", "Visible entry").int("entry#", 2).boolean("appears", true).log();
-    logger.warn().src(@src()).str("third", "Another visible entry").int("entry#", 3).boolean("appears", true).log();
-    logger.fatal().src(@src()).str("fourth", "Yet another visible entry").int("entry#", 4).boolean("appears", true).log();
+    logger.trace().msg("Trace entry").src(@src()).str("first", "Hidden entry").int("entry#", 1).boolean("appears", false).log();
+    logger.debug().msg("Debug entry").src(@src()).str("second", "Hidden entry").int("entry#", 2).boolean("appears", false).log();
+    logger.info().msg("Informational entry").src(@src()).str("third", "Visible entry").int("entry#", 3).boolean("appears", true).log();
+    logger.warn().msg("Warning entry").src(@src()).str("fourth", "Another visible entry").int("entry#", 4).boolean("appears", true).log();
+    logger.err().msg("Error entry").src(@src()).str("fifth", "Yet another visible entry").int("entry#", 5).boolean("appears", true).log();
+    logger.fatal().msg("Fatal error entry").src(@src()).str("sixth", "Yet another visible entry").int("entry#", 6).boolean("appears", true).log();
 }
 
 fn timeNoopLogging(pool: *LoggerPool) !u64 {

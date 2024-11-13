@@ -83,6 +83,11 @@ pub fn deinit(self: *Self) void {
     }
 }
 
+pub inline fn trace(self: *Self) *LogEntry {
+    var le = acquireEntry(self, .trace) catch return &noop_log_entry;
+    return le.str("@log", self.name);
+}
+
 pub inline fn debug(self: *Self) *LogEntry {
     var le = acquireEntry(self, .debug) catch return &noop_log_entry;
     return le.str("@log", self.name);
@@ -237,6 +242,15 @@ pub const LogEntry = struct {
         return self;
     }
 
+    pub inline fn msg(self: *LogEntry, opt_value: ?[]const u8) *LogEntry {
+        switch (self.appender) {
+            .noop => {},
+            .json => |*jctx| jctx.json_appender.msg(opt_value),
+            .text => |*tctx| tctx.text_appender.msg(opt_value),
+        }
+        return self;
+    }
+
     pub inline fn str(self: *LogEntry, key: []const u8, opt_value: ?[]const u8) *LogEntry {
         switch (self.appender) {
             .noop => {},
@@ -282,6 +296,15 @@ pub const LogEntry = struct {
         return self;
     }
 
+    pub inline fn obj(self: *LogEntry, key: []const u8, value: anytype) *LogEntry {
+        switch (self.appender) {
+            .noop => {},
+            .json => |*jctx| jctx.json_appender.obj(key, value),
+            .text => |*tctx| tctx.text_appender.obj(key, value),
+        }
+        return self;
+    }
+
     pub inline fn binary(self: *LogEntry, key: []const u8, opt_value: ?[]const u8) *LogEntry {
         switch (self.appender) {
             .noop => {},
@@ -305,6 +328,15 @@ pub const LogEntry = struct {
             .noop => {},
             .json => |*jctx| jctx.json_appender.errK(key, value),
             .text => |*tctx| tctx.text_appender.errK(key, value),
+        }
+        return self;
+    }
+
+    pub inline fn traceId(self: *LogEntry, opt_value: ?[]const u8) *LogEntry {
+        switch (self.appender) {
+            .noop => {},
+            .json => |*jctx| jctx.json_appender.traceId(opt_value),
+            .text => |*tctx| tctx.text_appender.traceId(opt_value),
         }
         return self;
     }
@@ -362,11 +394,11 @@ test "logger - smoke test" {
 }
 
 fn _tst_smoke_logger(logger: *Logger) !void {
-    logger.debug().ctx("debug smoke test").log();
-    logger.info().ctx("info smoke test").log();
+    logger.debug().msg("debug smoke test").log();
+    logger.info().msg("info smoke test").log();
 
-    var entry_1 = logger.info().ctx("info entry 1");
-    var entry_2 = logger.info().ctx("info entry 2");
+    var entry_1 = logger.info().msg("info entry 1");
+    var entry_2 = logger.info().msg("info entry 2");
 
     entry_1.log();
     entry_2.log();

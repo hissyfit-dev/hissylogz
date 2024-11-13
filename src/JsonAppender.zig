@@ -73,6 +73,10 @@ pub fn str(self: *Self, key: []const u8, opt_value: ?[]const u8) void {
     w.writeByte(',') catch return;
 }
 
+pub fn msg(self: *Self, opt_value: ?[]const u8) void {
+    self.str("@msg", opt_value);
+}
+
 pub fn strZ(self: *Self, key: []const u8, opt_value: ?[*:0]const u8) void {
     if (opt_value == null) {
         self.writeNull(key);
@@ -141,6 +145,28 @@ pub fn boolean(self: *Self, key: []const u8, value: anytype) void {
     w.print("\"{s}\":{s},", .{ key, if (bool_val) "true" else "false" }) catch return;
 }
 
+pub fn obj(self: *Self, key: []const u8, value: anytype) void {
+    const obj_val = switch (@typeInfo(@TypeOf(value))) {
+        .Optional => blk: {
+            if (value) |v| {
+                break :blk v;
+            }
+            self.writeNull(key);
+            return;
+        },
+        .Null => {
+            self.writeNull(key);
+            return;
+        },
+        else => value,
+    };
+
+    var w = self.log_buffer.writer();
+    w.print("\"{s}\":", .{key}) catch return;
+    std.json.stringify(obj_val, .{}, w) catch return;
+    w.writeByte(',') catch return;
+}
+
 pub fn binary(self: *Self, key: []const u8, opt_value: ?[]const u8) void {
     const value = opt_value orelse {
         self.writeNull(key);
@@ -184,6 +210,11 @@ pub fn errK(self: *Self, key: []const u8, value: anyerror) void {
     }
 }
 
+pub fn traceId(self: *Self, opt_value: ?[]const u8) void {
+    self.str("@trace_id", opt_value);
+}
+
+/// Deprecated, use obj() instead
 pub fn formatted(self: *Self, key: []const u8, comptime format: []const u8, values: anytype) void {
     var w = self.log_buffer.writer();
     w.print("\"{s}\":\"", .{key}) catch return;
@@ -257,6 +288,8 @@ test "json appender - smoke test" {
 
     var json_appender = try JsonAppender.init(allocator, appender_output, .debug, constants.Timestamp.now());
     defer json_appender.deinit();
+    json_appender.msg("Checking various values");
+    json_appender.traceId("12345-1234");
     json_appender.str("string_key", "string");
     json_appender.str("null_string_key", null);
     json_appender.int("int_key", 1066);
@@ -269,7 +302,7 @@ test "json appender - smoke test" {
     try werr.writeByte('\t');
     json_appender.log();
 
-    const expected = "\"string_key\":\"string\",\"null_string_key\":null,\"int_key\":1066,\"null_int_key\":null,\"embedded_key\":\"\\\"embedded_string_key\\\":\\\"embedded_string\\\",\\\"embedded_int_key\\\":1234}\"}";
+    const expected = "\"@msg\":\"Checking various values\",\"@trace_id\":\"12345-1234\",\"string_key\":\"string\",\"null_string_key\":null,\"int_key\":1066,\"null_int_key\":null,\"embedded_key\":\"\\\"embedded_string_key\\\":\\\"embedded_string\\\",\\\"embedded_int_key\\\":1234}\"}";
     try expectLogPostfix(&json_appender, expected);
 }
 
@@ -433,6 +466,24 @@ test "json appender - src" {
     const local_src = @src();
     json_appender.src(local_src);
     try expectLogPostfixFmt(&json_appender, "\"@src\":{{\"file\":\"src/JsonAppender.zig\",\"fn\":\"test.json appender - src\",\"line\":{d}}}}}", .{local_src.line});
+}
+
+test "json appender - obj" {
+    std.debug.print("json appender - obj\n", .{});
+    const allocator = testing.allocator;
+
+    var werr = std.io.getStdErr().writer();
+    const appender_output: JsonAppender.Output = .{
+        .writer = &werr,
+        .mutex = .{},
+    };
+    var json_appender = try JsonAppender.init(allocator, appender_output, .debug, constants.Timestamp.now());
+    defer json_appender.deinit();
+
+    const rats = .{ .some = "some", .thing = "thing" };
+
+    json_appender.obj("rats", rats);
+    try expectLogPostfixFmt(&json_appender, "\"rats\":{{\"some\":\"some\",\"thing\":\"thing\"}}}}", .{});
 }
 
 fn expectLogPostfix(json_appender: *JsonAppender, comptime expected: ?[]const u8) !void {
