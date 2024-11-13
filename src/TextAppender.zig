@@ -62,6 +62,10 @@ pub fn src(self: *Self, value: std.builtin.SourceLocation) void {
     self.writeObject("@src", .{ .file = value.file, .@"fn" = value.fn_name, .line = value.line });
 }
 
+pub fn msg(self: *Self, opt_value: ?[]const u8) void {
+    self.str("@msg", opt_value);
+}
+
 pub fn str(self: *Self, key: []const u8, opt_value: ?[]const u8) void {
     const value = opt_value orelse {
         self.writeNull(key);
@@ -141,6 +145,28 @@ pub fn boolean(self: *Self, key: []const u8, value: anytype) void {
     w.print("{s}={s}, ", .{ key, if (bool_val) "true" else "false" }) catch return;
 }
 
+pub fn obj(self: *Self, key: []const u8, value: anytype) void {
+    const obj_val = switch (@typeInfo(@TypeOf(value))) {
+        .Optional => blk: {
+            if (value) |v| {
+                break :blk v;
+            }
+            self.writeNull(key);
+            return;
+        },
+        .Null => {
+            self.writeNull(key);
+            return;
+        },
+        else => value,
+    };
+
+    var w = self.log_buffer.writer();
+    w.print("{s}=", .{key}) catch return;
+    std.json.stringify(obj_val, .{}, w) catch return;
+    w.writeAll(", ") catch return;
+}
+
 pub fn binary(self: *Self, key: []const u8, opt_value: ?[]const u8) void {
     const value = opt_value orelse {
         self.writeNull(key);
@@ -184,6 +210,11 @@ pub fn errK(self: *Self, key: []const u8, value: anyerror) void {
     }
 }
 
+pub fn traceId(self: *Self, opt_value: ?[]const u8) void {
+    self.str("@trace_id", opt_value);
+}
+
+/// Deprecated, use obj() instead
 pub fn formatted(self: *Self, key: []const u8, comptime format: []const u8, values: anytype) void {
     var w = self.log_buffer.writer();
     w.print("{s}=\"", .{key}) catch return;
