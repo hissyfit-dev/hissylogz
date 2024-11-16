@@ -332,20 +332,29 @@ pub const LogEntry = struct {
         return self;
     }
 
-    pub inline fn traceId(self: *LogEntry, opt_value: ?[]const u8) *LogEntry {
+    pub inline fn trace(self: *LogEntry, opt_value: ?[]const u8) *LogEntry {
         switch (self.appender) {
             .noop => {},
-            .json => |*jctx| jctx.json_appender.traceId(opt_value),
-            .text => |*tctx| tctx.text_appender.traceId(opt_value),
+            .json => |*jctx| jctx.json_appender.trace(opt_value),
+            .text => |*tctx| tctx.text_appender.trace(opt_value),
         }
         return self;
     }
 
-    pub inline fn formatted(self: *LogEntry, key: []const u8, comptime format: []const u8, values: anytype) *LogEntry {
+    pub inline fn span(self: *LogEntry, opt_value: ?[]const u8) *LogEntry {
         switch (self.appender) {
             .noop => {},
-            .json => |*jctx| jctx.json_appender.formatted(key, format, values),
-            .text => |*tctx| tctx.text_appender.formatted(key, format, values),
+            .json => |*jctx| jctx.json_appender.span(opt_value),
+            .text => |*tctx| tctx.text_appender.span(opt_value),
+        }
+        return self;
+    }
+
+    pub inline fn fmt(self: *LogEntry, key: []const u8, comptime format: []const u8, values: anytype) *LogEntry {
+        switch (self.appender) {
+            .noop => {},
+            .json => |*jctx| jctx.json_appender.fmt(key, format, values),
+            .text => |*tctx| tctx.text_appender.fmt(key, format, values),
         }
         return self;
     }

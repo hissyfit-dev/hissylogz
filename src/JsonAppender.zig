@@ -210,12 +210,15 @@ pub fn errK(self: *Self, key: []const u8, value: anyerror) void {
     }
 }
 
-pub fn traceId(self: *Self, opt_value: ?[]const u8) void {
+pub fn trace(self: *Self, opt_value: ?[]const u8) void {
     self.str("@trace_id", opt_value);
 }
 
-/// Deprecated, use obj() instead
-pub fn formatted(self: *Self, key: []const u8, comptime format: []const u8, values: anytype) void {
+pub fn span(self: *Self, opt_value: ?[]const u8) void {
+    self.str("@span_id", opt_value);
+}
+
+pub fn fmt(self: *Self, key: []const u8, comptime format: []const u8, values: anytype) void {
     var w = self.log_buffer.writer();
     w.print("\"{s}\":\"", .{key}) catch return;
     std.fmt.format(w, format, values) catch return;
@@ -289,7 +292,7 @@ test "json appender - smoke test" {
     var json_appender = try JsonAppender.init(allocator, appender_output, .debug, constants.Timestamp.now());
     defer json_appender.deinit();
     json_appender.msg("Checking various values");
-    json_appender.traceId("12345-1234");
+    json_appender.trace("12345-1234");
     json_appender.str("string_key", "string");
     json_appender.str("null_string_key", null);
     json_appender.int("int_key", 1066);
@@ -500,7 +503,7 @@ fn expectLogPostfix(json_appender: *JsonAppender, comptime expected: ?[]const u8
     json_appender.reset();
 }
 
-fn expectLogPostfixFmt(json_appender: *JsonAppender, comptime fmt: []const u8, args: anytype) !void {
+fn expectLogPostfixFmt(json_appender: *JsonAppender, comptime format: []const u8, args: anytype) !void {
     defer json_appender.reset();
 
     var out = std.ArrayList(u8).init(std.testing.allocator);
@@ -510,7 +513,7 @@ fn expectLogPostfixFmt(json_appender: *JsonAppender, comptime fmt: []const u8, a
     try json_appender.logTo(out.writer());
 
     var buf: [200]u8 = undefined;
-    const expected = try std.fmt.bufPrint(&buf, fmt, args);
+    const expected = try std.fmt.bufPrint(&buf, format, args);
     try std.testing.expectEqualStrings(expected, extractPostfix(out.items));
     json_appender.reset();
 }
