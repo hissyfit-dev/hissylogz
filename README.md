@@ -62,7 +62,7 @@ Each logger pool is thread-safe.
 
 Logger pools provision and cache loggers, each of which are in turn thread-safe (loggers are shared).
 
-Using a logger, entries my be created at various log levels (`debug`, `info`, `warn`, `err`, `fatal`), and named values attached to log entries via chain calls.
+Using a logger, entries my be created at various log levels (`fine`, `debug`, `info`, `warn`, `err`, `fatal`), and named values attached to log entries via chain calls.
 Such entries are "borrowed" from entry pools in loggers, and will be returned to the pool upon a terminating call to `log()`.
 
 > Gotcha: Do *not* use a `stdout` writer for logging in unit tests, use `stderr` instead.
@@ -78,7 +78,7 @@ const std = @import("std");
 const debug = std.debug;
 const io = std.io;
 
-const hissylogz = @import("hissylogz.zig");
+const hissylogz = @import("hissylogz");
 
 pub fn main() !void {
     // Prepare allocator
@@ -108,7 +108,7 @@ const std = @import("std");
 const debug = std.debug;
 const io = std.io;
 
-const hissylogz = @import("hissylogz.zig");
+const hissylogz = @import("hissylogz");
 
 pub fn main() !void {
     // Prepare allocator
