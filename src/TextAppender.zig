@@ -57,11 +57,17 @@ pub fn reset(self: *Self) void {
 }
 
 pub fn ctx(self: *Self, value: []const u8) void {
-    self.str("@ctx", value);
+    var w = self.log_buffer.writer();
+    w.print("<{s}> ", .{value}) catch return;
 }
 
 pub fn src(self: *Self, value: std.builtin.SourceLocation) void {
-    self.writeObject("@src", .{ .file = value.file, .@"fn" = value.fn_name, .line = value.line });
+    // self.writeObject("@src", .{ .file = value.file, .@"fn" = value.fn_name, .line = value.line });
+
+    var w = self.log_buffer.writer();
+    w.print("@src={s}:{d}: {s} ", .{ value.file, value.line, value.fn_name }) catch return;
+
+    //src/TextAppender.zig:437:33: e
 }
 
 pub fn msg(self: *Self, opt_value: ?[]const u8) void {
@@ -86,9 +92,9 @@ pub fn str(self: *Self, key: []const u8, opt_value: ?[]const u8) void {
         return;
     };
     var w = self.log_buffer.writer();
-    w.print("{s}=", .{key}) catch return;
+    w.print("{s}=\"", .{key}) catch return;
     std.json.encodeJsonString(value, .{}, w) catch return;
-    w.writeAll(", ") catch return;
+    w.writeAll("\" ") catch return;
 }
 
 pub fn strZ(self: *Self, key: []const u8, opt_value: ?[*:0]const u8) void {
@@ -116,7 +122,7 @@ pub fn int(self: *Self, key: []const u8, value: anytype) void {
     };
 
     var w = self.log_buffer.writer();
-    w.print("{s}={d}, ", .{ key, int_val }) catch return;
+    w.print("{s}={d} ", .{ key, int_val }) catch return;
 }
 
 pub fn float(self: *Self, key: []const u8, value: anytype) void {
@@ -136,7 +142,7 @@ pub fn float(self: *Self, key: []const u8, value: anytype) void {
     };
 
     var w = self.log_buffer.writer();
-    w.print("{s}={d}, ", .{ key, float_val }) catch return;
+    w.print("{s}={d} ", .{ key, float_val }) catch return;
 }
 
 pub fn boolean(self: *Self, key: []const u8, value: anytype) void {
@@ -156,7 +162,7 @@ pub fn boolean(self: *Self, key: []const u8, value: anytype) void {
     };
 
     var w = self.log_buffer.writer();
-    w.print("{s}={s}, ", .{ key, if (bool_val) "true" else "false" }) catch return;
+    w.print("{s}={s} ", .{ key, if (bool_val) "true" else "false" }) catch return;
 }
 
 pub fn obj(self: *Self, key: []const u8, value: anytype) void {
@@ -178,7 +184,7 @@ pub fn obj(self: *Self, key: []const u8, value: anytype) void {
     var w = self.log_buffer.writer();
     w.print("{s}=", .{key}) catch return;
     std.json.stringify(obj_val, .{}, w) catch return;
-    w.writeAll(", ") catch return;
+    w.writeByte(' ') catch return;
 }
 
 pub fn binary(self: *Self, key: []const u8, opt_value: ?[]const u8) void {
@@ -191,22 +197,11 @@ pub fn binary(self: *Self, key: []const u8, opt_value: ?[]const u8) void {
     defer self.allocator.free(encoded);
 
     var w = self.log_buffer.writer();
-    w.print("{s}=[{s}], ", .{ key, encoded }) catch return;
+    w.print("{s}=base64(\"{s}\") ", .{ key, encoded }) catch return;
 }
 
 pub fn err(self: *Self, value: anyerror) void {
-    const T = @TypeOf(value);
-
-    switch (@typeInfo(T)) {
-        .Optional => {
-            if (value) |v| {
-                self.str("@err", @errorName(v));
-            } else {
-                self.writeNull("@err");
-            }
-        },
-        else => self.str("@err", @errorName(value)),
-    }
+    return self.errK("@err", value);
 }
 
 pub fn errK(self: *Self, key: []const u8, value: anyerror) void {
@@ -215,39 +210,44 @@ pub fn errK(self: *Self, key: []const u8, value: anyerror) void {
     switch (@typeInfo(T)) {
         .Optional => {
             if (value) |v| {
-                self.str(key, @errorName(v));
+                self.rawStr(key, @errorName(v));
             } else {
                 self.writeNull(key);
             }
         },
-        else => self.str(key, @errorName(value)),
+        else => self.rawStr(key, @errorName(value)),
     }
 }
 
 pub fn trace(self: *Self, opt_value: ?[]const u8) void {
-    self.str("@trace_id", opt_value);
+    self.str("trace", opt_value);
 }
 
 pub fn span(self: *Self, opt_value: ?[]const u8) void {
-    self.str("@span_id", opt_value);
+    self.str("span", opt_value);
 }
 
 pub fn fmt(self: *Self, key: []const u8, comptime format: []const u8, values: anytype) void {
     var w = self.log_buffer.writer();
-    w.print("{s}=\"", .{key}) catch return;
+    w.print("{s}=", .{key}) catch return;
     std.fmt.format(w, format, values) catch return;
-    w.writeAll("\", ") catch return;
+    w.writeByte(' ') catch return;
+}
+
+fn rawStr(self: *Self, key: []const u8, value: []const u8) void {
+    var w = self.log_buffer.writer();
+    w.print("{s}={s} ", .{ key, value }) catch return;
 }
 
 fn writeNull(self: *Self, key: []const u8) void {
-    self.log_buffer.writer().print("{s}=null, ", .{key}) catch return;
+    self.log_buffer.writer().print("{s}=null ", .{key}) catch return;
 }
 
 fn writeObject(self: *Self, key: []const u8, value: anytype) void {
     var w = self.log_buffer.writer();
     w.print("{s}=", .{key}) catch return;
     std.json.stringify(value, .{}, w) catch return;
-    w.writeAll(", ") catch return;
+    w.writeByte(' ') catch return;
 }
 
 pub fn tryLog(self: *Self) AccessError!void {
@@ -274,7 +274,7 @@ fn logTo(self: *Self, writer: anytype) AccessError!void {
     nosuspend writer.print("{rfc3339} {s: >5}: {s}\n", .{
         self.timestamp,
         @tagName(self.level),
-        out_buffer[0 .. out_buffer.len - 2], // skip trailing comma and space (", ")
+        out_buffer[0 .. out_buffer.len - 1], // skip trailing space (' ')
     }) catch |e| {
         std.debug.print("Access error writing log entry: {any}\n", .{e});
         std_logger.err("Access error writing log entry: {any}\n", .{e});
@@ -300,7 +300,7 @@ test "text appender - binary" {
     const encoded = try base64.encode(allocator, &unencoded);
     defer allocator.free(encoded);
     json_appender.binary("key", &unencoded);
-    try expectLogPostfixFmt(&json_appender, "key=[{s}]", .{encoded});
+    try expectLogPostfixFmt(&json_appender, "key=base64(\"{s}\")", .{encoded});
 
     {
         json_appender.binary("key", @as(?[]const u8, null));
@@ -312,7 +312,7 @@ test "text appender - binary" {
         const real = try base64.encode(allocator, data[0..i]);
         defer allocator.free(real);
         json_appender.binary("k", data[0..i]);
-        try expectLogPostfixFmt(&json_appender, "k=[{s}]", .{real});
+        try expectLogPostfixFmt(&json_appender, "k=base64(\"{s}\")", .{real});
     }
 }
 
@@ -407,10 +407,10 @@ test "text appender - error" {
     defer json_appender.deinit();
 
     json_appender.errK("errK", error.OutOfMemory);
-    try expectLogPostfix(&json_appender, "errK=\"OutOfMemory\"");
+    try expectLogPostfix(&json_appender, "errK=OutOfMemory");
 
     json_appender.err(error.OutOfMemory);
-    try expectLogPostfix(&json_appender, "@err=\"OutOfMemory\"");
+    try expectLogPostfix(&json_appender, "@err=OutOfMemory");
 }
 
 test "text appender - ctx" {
@@ -426,7 +426,7 @@ test "text appender - ctx" {
     defer json_appender.deinit();
 
     json_appender.ctx("some context");
-    try expectLogPostfix(&json_appender, "@ctx=\"some context\"");
+    try expectLogPostfix(&json_appender, "<some context>");
 }
 
 test "text appender - src" {
@@ -443,7 +443,7 @@ test "text appender - src" {
 
     const local_src = @src();
     json_appender.src(local_src);
-    try expectLogPostfixFmt(&json_appender, "@src={{\"file\":\"src/TextAppender.zig\",\"fn\":\"test.text appender - src\",\"line\":{d}}}", .{local_src.line});
+    try expectLogPostfixFmt(&json_appender, "@src=src/TextAppender.zig:{d}: test.text appender - src", .{local_src.line});
 }
 
 fn expectLogPostfix(json_appender: *TextAppender, comptime expected: ?[]const u8) !void {
