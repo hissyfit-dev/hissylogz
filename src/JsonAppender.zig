@@ -82,6 +82,10 @@ pub fn msg(self: *Self, opt_value: ?[]const u8) void {
     self.str("@msg", opt_value);
 }
 
+pub fn name(self: *Self, opt_value: ?[]const u8) void {
+    self.str("@log", opt_value);
+}
+
 pub fn strZ(self: *Self, key: []const u8, opt_value: ?[*:0]const u8) void {
     if (opt_value == null) {
         self.writeNull(key);

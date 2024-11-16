@@ -87,32 +87,32 @@ pub fn deinit(self: *Self) void {
 
 pub inline fn fine(self: *Self) *LogEntry {
     var le = acquireEntry(self, .fine) catch return &noop_log_entry;
-    return le.str("@log", self.name);
+    return le.name(self.name);
 }
 
 pub inline fn debug(self: *Self) *LogEntry {
     var le = acquireEntry(self, .debug) catch return &noop_log_entry;
-    return le.str("@log", self.name);
+    return le.name(self.name);
 }
 
 pub inline fn info(self: *Self) *LogEntry {
     var le = acquireEntry(self, .info) catch return &noop_log_entry;
-    return le.str("@log", self.name);
+    return le.name(self.name);
 }
 
 pub inline fn warn(self: *Self) *LogEntry {
     var le = acquireEntry(self, .warn) catch return &noop_log_entry;
-    return le.str("@log", self.name);
+    return le.name(self.name);
 }
 
 pub inline fn err(self: *Self) *LogEntry {
     var le = acquireEntry(self, .err) catch return &noop_log_entry;
-    return le.str("@log", self.name);
+    return le.name(self.name);
 }
 
 pub inline fn fatal(self: *Self) *LogEntry {
     var le = acquireEntry(self, .fatal) catch return &noop_log_entry;
-    return le.str("@log", self.name);
+    return le.name(self.name);
 }
 
 fn acquireEntry(self: *Self, level: LogLevel) AllocationError!*LogEntry {
@@ -249,6 +249,15 @@ pub const LogEntry = struct {
             .noop => {},
             .json => |*jctx| jctx.json_appender.msg(opt_value),
             .text => |*tctx| tctx.text_appender.msg(opt_value),
+        }
+        return self;
+    }
+
+    pub inline fn name(self: *LogEntry, opt_value: ?[]const u8) *LogEntry {
+        switch (self.appender) {
+            .noop => {},
+            .json => |*jctx| jctx.json_appender.name(opt_value),
+            .text => |*tctx| tctx.text_appender.name(opt_value),
         }
         return self;
     }

@@ -65,7 +65,19 @@ pub fn src(self: *Self, value: std.builtin.SourceLocation) void {
 }
 
 pub fn msg(self: *Self, opt_value: ?[]const u8) void {
-    self.str("@msg", opt_value);
+    const value = opt_value orelse {
+        return;
+    };
+    var w = self.log_buffer.writer();
+    w.print("{s}: ", .{value}) catch return;
+}
+
+pub fn name(self: *Self, opt_value: ?[]const u8) void {
+    const value = opt_value orelse {
+        return;
+    };
+    var w = self.log_buffer.writer();
+    w.print("[{s}] ", .{value}) catch return;
 }
 
 pub fn str(self: *Self, key: []const u8, opt_value: ?[]const u8) void {
