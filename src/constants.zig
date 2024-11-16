@@ -22,7 +22,7 @@ pub const LogOutput = struct {
 
 /// Logging level
 pub const LogLevel = enum(u3) {
-    trace,
+    fine,
     debug,
     info,
     warn,
@@ -35,7 +35,7 @@ pub const LogLevel = enum(u3) {
         var buf: [5]u8 = undefined;
 
         const lower = std.ascii.lowerString(&buf, input);
-        if (std.mem.eql(u8, lower, "trace")) return .trace;
+        if (std.mem.eql(u8, lower, "fine")) return .fine;
         if (std.mem.eql(u8, lower, "debug")) return .debug;
         if (std.mem.eql(u8, lower, "info")) return .info;
         if (std.mem.eql(u8, lower, "warn")) return .warn;

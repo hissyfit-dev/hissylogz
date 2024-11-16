@@ -59,7 +59,10 @@ pub fn ctx(self: *Self, value: []const u8) void {
 }
 
 pub fn src(self: *Self, value: std.builtin.SourceLocation) void {
-    self.writeObject("@src", .{ .file = value.file, .@"fn" = value.fn_name, .line = value.line });
+    var w = self.log_buffer.writer();
+    w.writeAll("\"@src\":") catch return;
+    std.json.stringify(.{ .file = value.file, .@"fn" = value.fn_name, .line = value.line }, .{}, w) catch return;
+    w.writeByte(',') catch return;
 }
 
 pub fn str(self: *Self, key: []const u8, opt_value: ?[]const u8) void {
@@ -231,13 +234,6 @@ pub fn tryLog(self: *Self) AccessError!void {
 
 fn writeNull(self: *Self, key: []const u8) void {
     self.log_buffer.writer().print("\"{s}\":null,", .{key}) catch return;
-}
-
-fn writeObject(self: *Self, key: []const u8, value: anytype) void {
-    var w = self.log_buffer.writer();
-    w.print("\"{s}\":", .{key}) catch return;
-    std.json.stringify(value, .{}, w) catch return;
-    w.writeByte(',') catch return;
 }
 
 pub fn log(self: *Self) void {

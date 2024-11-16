@@ -37,7 +37,7 @@ pub fn main() !void {
 
 fn useGlobalLoggerPool() void {
     var logger = hissylogz.globalLoggerPool().logger("useGlobalLoggerPool");
-    logger.trace().msg("Trace entry").src(@src()).str("first", "Hidden entry").int("entry#", 1).boolean("appears", false).log();
+    logger.fine().msg("Fine entry").src(@src()).str("first", "Hidden entry").int("entry#", 1).boolean("appears", false).log();
     logger.debug().msg("Debug entry").src(@src()).str("second", "Hidden entry").int("entry#", 2).boolean("appears", false).log();
     logger.info().msg("Informational entry").src(@src()).str("third", "Visible entry").int("entry#", 3).boolean("appears", true).log();
     logger.warn().msg("Warning entry").src(@src()).str("fourth", "Another visible entry").int("entry#", 4).boolean("appears", true).log();

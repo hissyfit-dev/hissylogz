@@ -83,8 +83,8 @@ pub fn deinit(self: *Self) void {
     }
 }
 
-pub inline fn trace(self: *Self) *LogEntry {
-    var le = acquireEntry(self, .trace) catch return &noop_log_entry;
+pub inline fn fine(self: *Self) *LogEntry {
+    var le = acquireEntry(self, .fine) catch return &noop_log_entry;
     return le.str("@log", self.name);
 }
 
@@ -335,8 +335,8 @@ pub const LogEntry = struct {
     pub inline fn trace(self: *LogEntry, opt_value: ?[]const u8) *LogEntry {
         switch (self.appender) {
             .noop => {},
-            .json => |*jctx| jctx.json_appender.trace(opt_value),
-            .text => |*tctx| tctx.text_appender.trace(opt_value),
+            .json => |*jctx| jctx.json_appender.fine(opt_value),
+            .text => |*tctx| tctx.text_appender.fine(opt_value),
         }
         return self;
     }
