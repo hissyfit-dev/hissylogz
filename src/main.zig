@@ -31,10 +31,17 @@ pub fn main() !void {
         @as(i64, @intCast(@divFloor(no_op_time, std.time.ns_per_ms))),
     });
 
+    var thread_logger_pool = try hissylogz.loggerPool(allocator, .{
+        .filter_level = .fine,
+        .log_format = .text,
+        .writer = @constCast(&std.io.getStdOut().writer()),
+    });
+    defer thread_logger_pool.deinit();
+
     var threads: [10]std.Thread = undefined;
 
     for (0..9) |tno| {
-        threads[tno] = try std.Thread.spawn(.{}, threadLogger, .{ allocator, tno });
+        threads[tno] = try std.Thread.spawn(.{}, threadLogger, .{ &thread_logger_pool, allocator, tno });
     }
 
     for (0..9) |tno| {
@@ -45,13 +52,13 @@ pub fn main() !void {
     allocator.free(one_two_three);
 }
 
-fn threadLogger(allocator: std.mem.Allocator, tno: usize) void {
+fn threadLogger(logger_pool: *hissylogz.LoggerPool, allocator: std.mem.Allocator, tno: usize) void {
     const logger_name = std.fmt.allocPrint(allocator, "tno-{d}", .{tno}) catch return;
     defer allocator.free(logger_name);
 
     const tid = std.Thread.getCurrentId();
 
-    var logger = hissylogz.globalLoggerPool().logger(logger_name);
+    var logger = logger_pool.logger(logger_name);
 
     for (0..5) |idx| {
         logger.fine().msg("Fine entry").int("tid", tid).src(@src()).int("idx", idx).log();
