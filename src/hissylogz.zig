@@ -33,7 +33,6 @@ pub const Options = struct {
 pub fn loggerPool(allocator: std.mem.Allocator, options: Options) errors.AllocationError!LoggerPool {
     const output: constants.LogOutput = .{
         .writer = options.writer,
-        .mutex = .{},
     };
     const log_options: LogOptions = .{ .output = output, .format = options.log_format, .level = options.filter_level };
     return try LoggerPool.init(allocator, log_options);
@@ -111,16 +110,16 @@ test "hissylogz - dependencies trigger" {
 
     var w = std.io.getStdErr().writer();
     _ = &w;
+    var mtx: std.Thread.Mutex = .{};
     const output: LogOutput = .{
         .writer = &w,
-        .mutex = .{},
     };
-    var json_appender = try JsonAppender.init(allocator, output, .debug, constants.Timestamp.now());
+    var json_appender = try JsonAppender.init(allocator, output, &mtx, .debug, constants.Timestamp.now());
     defer json_appender.deinit();
 
     std.debug.print("\ttext appender\n", .{});
 
-    var text_appender = try TextAppender.init(allocator, output, .debug, constants.Timestamp.now());
+    var text_appender = try TextAppender.init(allocator, output, &mtx, .debug, constants.Timestamp.now());
     defer text_appender.deinit();
 
     std.debug.print("\tlogger\n", .{});
@@ -129,7 +128,8 @@ test "hissylogz - dependencies trigger" {
         .level = .debug,
         .output = output,
     };
-    var logger = try Logger.init("logging", allocator, log_options);
+
+    var logger = try Logger.init("logging", allocator, log_options, &mtx);
     defer logger.deinit();
 
     std.debug.print("\tlogger pool\n", .{});

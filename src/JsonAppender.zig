@@ -28,17 +28,19 @@ pub const Output = constants.LogOutput;
 
 allocator: std.mem.Allocator,
 output: Output,
+output_mutex: *std.Thread.Mutex,
 log_buffer: LogBuffer,
 level: LogLevel,
 timestamp: Timestamp,
 
-pub fn init(allocator: std.mem.Allocator, output: Output, level: LogLevel, timestamp: Timestamp) AllocationError!Self {
+pub fn init(allocator: std.mem.Allocator, output: Output, output_mutex: *std.Thread.Mutex, level: LogLevel, timestamp: Timestamp) AllocationError!Self {
     var new_log_buffer = try LogBuffer.init(allocator);
     errdefer new_log_buffer.deinit();
 
     return .{
         .allocator = allocator,
         .output = output,
+        .output_mutex = output_mutex,
         .log_buffer = new_log_buffer,
         .level = level,
         .timestamp = timestamp,
@@ -59,7 +61,10 @@ pub fn ctx(self: *Self, value: []const u8) void {
 }
 
 pub fn src(self: *Self, value: std.builtin.SourceLocation) void {
-    self.writeObject("@src", .{ .file = value.file, .@"fn" = value.fn_name, .line = value.line });
+    var w = self.log_buffer.writer();
+    w.writeAll("\"@src\":") catch return;
+    std.json.stringify(.{ .file = value.file, .@"fn" = value.fn_name, .line = value.line }, .{}, w) catch return;
+    w.writeByte(',') catch return;
 }
 
 pub fn str(self: *Self, key: []const u8, opt_value: ?[]const u8) void {
@@ -75,6 +80,10 @@ pub fn str(self: *Self, key: []const u8, opt_value: ?[]const u8) void {
 
 pub fn msg(self: *Self, opt_value: ?[]const u8) void {
     self.str("@msg", opt_value);
+}
+
+pub fn name(self: *Self, opt_value: ?[]const u8) void {
+    self.str("@log", opt_value);
 }
 
 pub fn strZ(self: *Self, key: []const u8, opt_value: ?[*:0]const u8) void {
@@ -210,12 +219,15 @@ pub fn errK(self: *Self, key: []const u8, value: anyerror) void {
     }
 }
 
-pub fn traceId(self: *Self, opt_value: ?[]const u8) void {
+pub fn trace(self: *Self, opt_value: ?[]const u8) void {
     self.str("@trace_id", opt_value);
 }
 
-/// Deprecated, use obj() instead
-pub fn formatted(self: *Self, key: []const u8, comptime format: []const u8, values: anytype) void {
+pub fn span(self: *Self, opt_value: ?[]const u8) void {
+    self.str("@span_id", opt_value);
+}
+
+pub fn fmt(self: *Self, key: []const u8, comptime format: []const u8, values: anytype) void {
     var w = self.log_buffer.writer();
     w.print("\"{s}\":\"", .{key}) catch return;
     std.fmt.format(w, format, values) catch return;
@@ -228,13 +240,6 @@ pub fn tryLog(self: *Self) AccessError!void {
 
 fn writeNull(self: *Self, key: []const u8) void {
     self.log_buffer.writer().print("\"{s}\":null,", .{key}) catch return;
-}
-
-fn writeObject(self: *Self, key: []const u8, value: anytype) void {
-    var w = self.log_buffer.writer();
-    w.print("\"{s}\":", .{key}) catch return;
-    std.json.stringify(value, .{}, w) catch return;
-    w.writeByte(',') catch return;
 }
 
 pub fn log(self: *Self) void {
@@ -250,8 +255,8 @@ fn logTo(self: *Self, writer: anytype) AccessError!void {
     }
 
     // Lock output
-    self.output.mutex.lock();
-    defer self.output.mutex.unlock();
+    self.output_mutex.lock();
+    defer self.output_mutex.unlock();
 
     // Write log entry
     nosuspend writer.print("{{\"@ts\":\"{rfc3339}\",\"@lvl\":\"{s}\",{s}}}\n", .{
@@ -274,22 +279,22 @@ test "json appender - smoke test" {
     var werr = std.io.getStdErr().writer();
     const appender_output: JsonAppender.Output = .{
         .writer = &werr,
-        .mutex = .{},
     };
+    var mtx: std.Thread.Mutex = .{};
 
-    var json_appender_extra1 = try JsonAppender.init(allocator, appender_output, .debug, constants.Timestamp.now());
+    var json_appender_extra1 = try JsonAppender.init(allocator, appender_output, &mtx, .debug, constants.Timestamp.now());
     defer json_appender_extra1.deinit();
     _ = try json_appender_extra1.log_buffer.write("ABCXYZ");
 
-    var json_appender_extra2 = try JsonAppender.init(allocator, appender_output, .debug, constants.Timestamp.now());
+    var json_appender_extra2 = try JsonAppender.init(allocator, appender_output, &mtx, .debug, constants.Timestamp.now());
     defer json_appender_extra2.deinit();
     json_appender_extra2.str("embedded_string_key", "embedded_string");
     json_appender_extra2.int("embedded_int_key", 1234);
 
-    var json_appender = try JsonAppender.init(allocator, appender_output, .debug, constants.Timestamp.now());
+    var json_appender = try JsonAppender.init(allocator, appender_output, &mtx, .debug, constants.Timestamp.now());
     defer json_appender.deinit();
     json_appender.msg("Checking various values");
-    json_appender.traceId("12345-1234");
+    json_appender.trace("12345-1234");
     json_appender.str("string_key", "string");
     json_appender.str("null_string_key", null);
     json_appender.int("int_key", 1066);
@@ -313,9 +318,10 @@ test "json appender - binary" {
     var werr = std.io.getStdErr().writer();
     const appender_output: JsonAppender.Output = .{
         .writer = &werr,
-        .mutex = .{},
     };
-    var json_appender = try JsonAppender.init(allocator, appender_output, .debug, constants.Timestamp.now());
+    var mtx: std.Thread.Mutex = .{};
+
+    var json_appender = try JsonAppender.init(allocator, appender_output, &mtx, .debug, constants.Timestamp.now());
     defer json_appender.deinit();
 
     const unencoded = [_]u8{ 'b', 'i', 'n', 'a', 'r', 'y' };
@@ -345,9 +351,10 @@ test "json appender - int" {
     var werr = std.io.getStdErr().writer();
     const appender_output: JsonAppender.Output = .{
         .writer = &werr,
-        .mutex = .{},
     };
-    var json_appender = try JsonAppender.init(allocator, appender_output, .debug, constants.Timestamp.now());
+    var mtx: std.Thread.Mutex = .{};
+
+    var json_appender = try JsonAppender.init(allocator, appender_output, &mtx, .debug, constants.Timestamp.now());
     defer json_appender.deinit();
 
     json_appender.int("key", 0);
@@ -373,9 +380,10 @@ test "json appender - boolean" {
     var werr = std.io.getStdErr().writer();
     const appender_output: JsonAppender.Output = .{
         .writer = &werr,
-        .mutex = .{},
     };
-    var json_appender = try JsonAppender.init(allocator, appender_output, .debug, constants.Timestamp.now());
+    var mtx: std.Thread.Mutex = .{};
+
+    var json_appender = try JsonAppender.init(allocator, appender_output, &mtx, .debug, constants.Timestamp.now());
     defer json_appender.deinit();
 
     json_appender.boolean("cats", true);
@@ -395,9 +403,10 @@ test "json appender - float" {
     var werr = std.io.getStdErr().writer();
     const appender_output: JsonAppender.Output = .{
         .writer = &werr,
-        .mutex = .{},
     };
-    var json_appender = try JsonAppender.init(allocator, appender_output, .debug, constants.Timestamp.now());
+    var mtx: std.Thread.Mutex = .{};
+
+    var json_appender = try JsonAppender.init(allocator, appender_output, &mtx, .debug, constants.Timestamp.now());
     defer json_appender.deinit();
 
     json_appender.float("key", 0);
@@ -423,9 +432,10 @@ test "json appender - error" {
     var werr = std.io.getStdErr().writer();
     const appender_output: JsonAppender.Output = .{
         .writer = &werr,
-        .mutex = .{},
     };
-    var json_appender = try JsonAppender.init(allocator, appender_output, .debug, constants.Timestamp.now());
+    var mtx: std.Thread.Mutex = .{};
+
+    var json_appender = try JsonAppender.init(allocator, appender_output, &mtx, .debug, constants.Timestamp.now());
     defer json_appender.deinit();
 
     json_appender.errK("errK", error.OutOfMemory);
@@ -442,9 +452,10 @@ test "json appender - ctx" {
     var werr = std.io.getStdErr().writer();
     const appender_output: JsonAppender.Output = .{
         .writer = &werr,
-        .mutex = .{},
     };
-    var json_appender = try JsonAppender.init(allocator, appender_output, .debug, constants.Timestamp.now());
+    var mtx: std.Thread.Mutex = .{};
+
+    var json_appender = try JsonAppender.init(allocator, appender_output, &mtx, .debug, constants.Timestamp.now());
     defer json_appender.deinit();
 
     json_appender.ctx("some context");
@@ -458,9 +469,10 @@ test "json appender - src" {
     var werr = std.io.getStdErr().writer();
     const appender_output: JsonAppender.Output = .{
         .writer = &werr,
-        .mutex = .{},
     };
-    var json_appender = try JsonAppender.init(allocator, appender_output, .debug, constants.Timestamp.now());
+    var mtx: std.Thread.Mutex = .{};
+
+    var json_appender = try JsonAppender.init(allocator, appender_output, &mtx, .debug, constants.Timestamp.now());
     defer json_appender.deinit();
 
     const local_src = @src();
@@ -475,9 +487,9 @@ test "json appender - obj" {
     var werr = std.io.getStdErr().writer();
     const appender_output: JsonAppender.Output = .{
         .writer = &werr,
-        .mutex = .{},
     };
-    var json_appender = try JsonAppender.init(allocator, appender_output, .debug, constants.Timestamp.now());
+    var mtx: std.Thread.Mutex = .{};
+    var json_appender = try JsonAppender.init(allocator, appender_output, &mtx, .debug, constants.Timestamp.now());
     defer json_appender.deinit();
 
     const rats = .{ .some = "some", .thing = "thing" };
@@ -500,7 +512,7 @@ fn expectLogPostfix(json_appender: *JsonAppender, comptime expected: ?[]const u8
     json_appender.reset();
 }
 
-fn expectLogPostfixFmt(json_appender: *JsonAppender, comptime fmt: []const u8, args: anytype) !void {
+fn expectLogPostfixFmt(json_appender: *JsonAppender, comptime format: []const u8, args: anytype) !void {
     defer json_appender.reset();
 
     var out = std.ArrayList(u8).init(std.testing.allocator);
@@ -510,7 +522,7 @@ fn expectLogPostfixFmt(json_appender: *JsonAppender, comptime fmt: []const u8, a
     try json_appender.logTo(out.writer());
 
     var buf: [200]u8 = undefined;
-    const expected = try std.fmt.bufPrint(&buf, fmt, args);
+    const expected = try std.fmt.bufPrint(&buf, format, args);
     try std.testing.expectEqualStrings(expected, extractPostfix(out.items));
     json_appender.reset();
 }

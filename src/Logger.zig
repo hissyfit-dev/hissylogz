@@ -34,11 +34,12 @@ allocator: std.mem.Allocator,
 entry_pools: []LogEntryPool,
 entry_pools_mutex: std.Thread.Mutex,
 output: LogOutput,
+output_mutex: *std.Thread.Mutex,
 format: LogFormat,
 level: LogLevel,
 level_filter_ordinal: u3,
 
-pub fn init(name: []const u8, allocator: std.mem.Allocator, options: LogOptions) AllocationError!Self {
+pub fn init(name: []const u8, allocator: std.mem.Allocator, options: LogOptions, output_mutex: *std.Thread.Mutex) AllocationError!Self {
     const logger_name = allocator.dupe(u8, name) catch return AllocationError.OutOfMemory;
     errdefer allocator.free(name);
 
@@ -62,6 +63,7 @@ pub fn init(name: []const u8, allocator: std.mem.Allocator, options: LogOptions)
         .entry_pools_mutex = .{},
         .output = options.output,
         .level = options.level,
+        .output_mutex = output_mutex,
         .format = options.format,
         .level_filter_ordinal = level_filter_ordinal,
     };
@@ -83,34 +85,34 @@ pub fn deinit(self: *Self) void {
     }
 }
 
-pub inline fn trace(self: *Self) *LogEntry {
-    var le = acquireEntry(self, .trace) catch return &noop_log_entry;
-    return le.str("@log", self.name);
+pub inline fn fine(self: *Self) *LogEntry {
+    var le = acquireEntry(self, .fine) catch return &noop_log_entry;
+    return le.name(self.name);
 }
 
 pub inline fn debug(self: *Self) *LogEntry {
     var le = acquireEntry(self, .debug) catch return &noop_log_entry;
-    return le.str("@log", self.name);
+    return le.name(self.name);
 }
 
 pub inline fn info(self: *Self) *LogEntry {
     var le = acquireEntry(self, .info) catch return &noop_log_entry;
-    return le.str("@log", self.name);
+    return le.name(self.name);
 }
 
 pub inline fn warn(self: *Self) *LogEntry {
     var le = acquireEntry(self, .warn) catch return &noop_log_entry;
-    return le.str("@log", self.name);
+    return le.name(self.name);
 }
 
 pub inline fn err(self: *Self) *LogEntry {
     var le = acquireEntry(self, .err) catch return &noop_log_entry;
-    return le.str("@log", self.name);
+    return le.name(self.name);
 }
 
 pub inline fn fatal(self: *Self) *LogEntry {
     var le = acquireEntry(self, .fatal) catch return &noop_log_entry;
-    return le.str("@log", self.name);
+    return le.name(self.name);
 }
 
 fn acquireEntry(self: *Self, level: LogLevel) AllocationError!*LogEntry {
@@ -154,13 +156,13 @@ fn createLogEntry(self: *Self, level: LogLevel) AllocationError!LogEntry {
     return switch (self.format) {
         .json => {
             return LogEntry.init(.{ .json = .{
-                .json_appender = try JsonAppender.init(self.allocator, self.output, level, Timestamp.now()),
+                .json_appender = try JsonAppender.init(self.allocator, self.output, self.output_mutex, level, Timestamp.now()),
                 .logger = self,
             } });
         },
         .text => {
             return LogEntry.init(.{ .text = .{
-                .text_appender = try TextAppender.init(self.allocator, self.output, level, Timestamp.now()),
+                .text_appender = try TextAppender.init(self.allocator, self.output, self.output_mutex, level, Timestamp.now()),
                 .logger = self,
             } });
         },
@@ -251,6 +253,15 @@ pub const LogEntry = struct {
         return self;
     }
 
+    pub inline fn name(self: *LogEntry, opt_value: ?[]const u8) *LogEntry {
+        switch (self.appender) {
+            .noop => {},
+            .json => |*jctx| jctx.json_appender.name(opt_value),
+            .text => |*tctx| tctx.text_appender.name(opt_value),
+        }
+        return self;
+    }
+
     pub inline fn str(self: *LogEntry, key: []const u8, opt_value: ?[]const u8) *LogEntry {
         switch (self.appender) {
             .noop => {},
@@ -332,20 +343,29 @@ pub const LogEntry = struct {
         return self;
     }
 
-    pub inline fn traceId(self: *LogEntry, opt_value: ?[]const u8) *LogEntry {
+    pub inline fn trace(self: *LogEntry, opt_value: ?[]const u8) *LogEntry {
         switch (self.appender) {
             .noop => {},
-            .json => |*jctx| jctx.json_appender.traceId(opt_value),
-            .text => |*tctx| tctx.text_appender.traceId(opt_value),
+            .json => |*jctx| jctx.json_appender.fine(opt_value),
+            .text => |*tctx| tctx.text_appender.fine(opt_value),
         }
         return self;
     }
 
-    pub inline fn formatted(self: *LogEntry, key: []const u8, comptime format: []const u8, values: anytype) *LogEntry {
+    pub inline fn span(self: *LogEntry, opt_value: ?[]const u8) *LogEntry {
         switch (self.appender) {
             .noop => {},
-            .json => |*jctx| jctx.json_appender.formatted(key, format, values),
-            .text => |*tctx| tctx.text_appender.formatted(key, format, values),
+            .json => |*jctx| jctx.json_appender.span(opt_value),
+            .text => |*tctx| tctx.text_appender.span(opt_value),
+        }
+        return self;
+    }
+
+    pub inline fn fmt(self: *LogEntry, key: []const u8, comptime format: []const u8, values: anytype) *LogEntry {
+        switch (self.appender) {
+            .noop => {},
+            .json => |*jctx| jctx.json_appender.fmt(key, format, values),
+            .text => |*tctx| tctx.text_appender.fmt(key, format, values),
         }
         return self;
     }
@@ -371,14 +391,14 @@ test "logger - smoke test" {
     var werr = std.io.getStdErr().writer();
     const output: LogOutput = .{
         .writer = &werr,
-        .mutex = .{},
     };
+    var mtx: std.Thread.Mutex = .{};
 
     var json_logger = try Logger.init("json smoke test", allocator, .{
         .format = .json,
         .level = .debug,
         .output = output,
-    });
+    }, &mtx);
     defer json_logger.deinit();
 
     try _tst_smoke_logger(&json_logger);
@@ -387,7 +407,7 @@ test "logger - smoke test" {
         .format = .text,
         .level = .debug,
         .output = output,
-    });
+    }, &mtx);
     defer text_logger.deinit();
 
     try _tst_smoke_logger(&text_logger);
