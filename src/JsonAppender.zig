@@ -28,17 +28,19 @@ pub const Output = constants.LogOutput;
 
 allocator: std.mem.Allocator,
 output: Output,
+output_mutex: *std.Thread.Mutex,
 log_buffer: LogBuffer,
 level: LogLevel,
 timestamp: Timestamp,
 
-pub fn init(allocator: std.mem.Allocator, output: Output, level: LogLevel, timestamp: Timestamp) AllocationError!Self {
+pub fn init(allocator: std.mem.Allocator, output: Output, output_mutex: *std.Thread.Mutex, level: LogLevel, timestamp: Timestamp) AllocationError!Self {
     var new_log_buffer = try LogBuffer.init(allocator);
     errdefer new_log_buffer.deinit();
 
     return .{
         .allocator = allocator,
         .output = output,
+        .output_mutex = output_mutex,
         .log_buffer = new_log_buffer,
         .level = level,
         .timestamp = timestamp,
@@ -249,8 +251,8 @@ fn logTo(self: *Self, writer: anytype) AccessError!void {
     }
 
     // Lock output
-    self.output.mutex.lock();
-    defer self.output.mutex.unlock();
+    self.output_mutex.lock();
+    defer self.output_mutex.unlock();
 
     // Write log entry
     nosuspend writer.print("{{\"@ts\":\"{rfc3339}\",\"@lvl\":\"{s}\",{s}}}\n", .{
@@ -273,19 +275,19 @@ test "json appender - smoke test" {
     var werr = std.io.getStdErr().writer();
     const appender_output: JsonAppender.Output = .{
         .writer = &werr,
-        .mutex = .{},
     };
+    var mtx: std.Thread.Mutex = .{};
 
-    var json_appender_extra1 = try JsonAppender.init(allocator, appender_output, .debug, constants.Timestamp.now());
+    var json_appender_extra1 = try JsonAppender.init(allocator, appender_output, &mtx, .debug, constants.Timestamp.now());
     defer json_appender_extra1.deinit();
     _ = try json_appender_extra1.log_buffer.write("ABCXYZ");
 
-    var json_appender_extra2 = try JsonAppender.init(allocator, appender_output, .debug, constants.Timestamp.now());
+    var json_appender_extra2 = try JsonAppender.init(allocator, appender_output, &mtx, .debug, constants.Timestamp.now());
     defer json_appender_extra2.deinit();
     json_appender_extra2.str("embedded_string_key", "embedded_string");
     json_appender_extra2.int("embedded_int_key", 1234);
 
-    var json_appender = try JsonAppender.init(allocator, appender_output, .debug, constants.Timestamp.now());
+    var json_appender = try JsonAppender.init(allocator, appender_output, &mtx, .debug, constants.Timestamp.now());
     defer json_appender.deinit();
     json_appender.msg("Checking various values");
     json_appender.trace("12345-1234");
@@ -312,9 +314,10 @@ test "json appender - binary" {
     var werr = std.io.getStdErr().writer();
     const appender_output: JsonAppender.Output = .{
         .writer = &werr,
-        .mutex = .{},
     };
-    var json_appender = try JsonAppender.init(allocator, appender_output, .debug, constants.Timestamp.now());
+    var mtx: std.Thread.Mutex = .{};
+
+    var json_appender = try JsonAppender.init(allocator, appender_output, &mtx, .debug, constants.Timestamp.now());
     defer json_appender.deinit();
 
     const unencoded = [_]u8{ 'b', 'i', 'n', 'a', 'r', 'y' };
@@ -344,9 +347,10 @@ test "json appender - int" {
     var werr = std.io.getStdErr().writer();
     const appender_output: JsonAppender.Output = .{
         .writer = &werr,
-        .mutex = .{},
     };
-    var json_appender = try JsonAppender.init(allocator, appender_output, .debug, constants.Timestamp.now());
+    var mtx: std.Thread.Mutex = .{};
+
+    var json_appender = try JsonAppender.init(allocator, appender_output, &mtx, .debug, constants.Timestamp.now());
     defer json_appender.deinit();
 
     json_appender.int("key", 0);
@@ -372,9 +376,10 @@ test "json appender - boolean" {
     var werr = std.io.getStdErr().writer();
     const appender_output: JsonAppender.Output = .{
         .writer = &werr,
-        .mutex = .{},
     };
-    var json_appender = try JsonAppender.init(allocator, appender_output, .debug, constants.Timestamp.now());
+    var mtx: std.Thread.Mutex = .{};
+
+    var json_appender = try JsonAppender.init(allocator, appender_output, &mtx, .debug, constants.Timestamp.now());
     defer json_appender.deinit();
 
     json_appender.boolean("cats", true);
@@ -394,9 +399,10 @@ test "json appender - float" {
     var werr = std.io.getStdErr().writer();
     const appender_output: JsonAppender.Output = .{
         .writer = &werr,
-        .mutex = .{},
     };
-    var json_appender = try JsonAppender.init(allocator, appender_output, .debug, constants.Timestamp.now());
+    var mtx: std.Thread.Mutex = .{};
+
+    var json_appender = try JsonAppender.init(allocator, appender_output, &mtx, .debug, constants.Timestamp.now());
     defer json_appender.deinit();
 
     json_appender.float("key", 0);
@@ -422,9 +428,10 @@ test "json appender - error" {
     var werr = std.io.getStdErr().writer();
     const appender_output: JsonAppender.Output = .{
         .writer = &werr,
-        .mutex = .{},
     };
-    var json_appender = try JsonAppender.init(allocator, appender_output, .debug, constants.Timestamp.now());
+    var mtx: std.Thread.Mutex = .{};
+
+    var json_appender = try JsonAppender.init(allocator, appender_output, &mtx, .debug, constants.Timestamp.now());
     defer json_appender.deinit();
 
     json_appender.errK("errK", error.OutOfMemory);
@@ -441,9 +448,10 @@ test "json appender - ctx" {
     var werr = std.io.getStdErr().writer();
     const appender_output: JsonAppender.Output = .{
         .writer = &werr,
-        .mutex = .{},
     };
-    var json_appender = try JsonAppender.init(allocator, appender_output, .debug, constants.Timestamp.now());
+    var mtx: std.Thread.Mutex = .{};
+
+    var json_appender = try JsonAppender.init(allocator, appender_output, &mtx, .debug, constants.Timestamp.now());
     defer json_appender.deinit();
 
     json_appender.ctx("some context");
@@ -457,9 +465,10 @@ test "json appender - src" {
     var werr = std.io.getStdErr().writer();
     const appender_output: JsonAppender.Output = .{
         .writer = &werr,
-        .mutex = .{},
     };
-    var json_appender = try JsonAppender.init(allocator, appender_output, .debug, constants.Timestamp.now());
+    var mtx: std.Thread.Mutex = .{};
+
+    var json_appender = try JsonAppender.init(allocator, appender_output, &mtx, .debug, constants.Timestamp.now());
     defer json_appender.deinit();
 
     const local_src = @src();
@@ -474,9 +483,9 @@ test "json appender - obj" {
     var werr = std.io.getStdErr().writer();
     const appender_output: JsonAppender.Output = .{
         .writer = &werr,
-        .mutex = .{},
     };
-    var json_appender = try JsonAppender.init(allocator, appender_output, .debug, constants.Timestamp.now());
+    var mtx: std.Thread.Mutex = .{};
+    var json_appender = try JsonAppender.init(allocator, appender_output, &mtx, .debug, constants.Timestamp.now());
     defer json_appender.deinit();
 
     const rats = .{ .some = "some", .thing = "thing" };

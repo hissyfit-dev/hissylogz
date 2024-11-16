@@ -34,11 +34,12 @@ allocator: std.mem.Allocator,
 entry_pools: []LogEntryPool,
 entry_pools_mutex: std.Thread.Mutex,
 output: LogOutput,
+output_mutex: *std.Thread.Mutex,
 format: LogFormat,
 level: LogLevel,
 level_filter_ordinal: u3,
 
-pub fn init(name: []const u8, allocator: std.mem.Allocator, options: LogOptions) AllocationError!Self {
+pub fn init(name: []const u8, allocator: std.mem.Allocator, options: LogOptions, output_mutex: *std.Thread.Mutex) AllocationError!Self {
     const logger_name = allocator.dupe(u8, name) catch return AllocationError.OutOfMemory;
     errdefer allocator.free(name);
 
@@ -62,6 +63,7 @@ pub fn init(name: []const u8, allocator: std.mem.Allocator, options: LogOptions)
         .entry_pools_mutex = .{},
         .output = options.output,
         .level = options.level,
+        .output_mutex = output_mutex,
         .format = options.format,
         .level_filter_ordinal = level_filter_ordinal,
     };
@@ -154,13 +156,13 @@ fn createLogEntry(self: *Self, level: LogLevel) AllocationError!LogEntry {
     return switch (self.format) {
         .json => {
             return LogEntry.init(.{ .json = .{
-                .json_appender = try JsonAppender.init(self.allocator, self.output, level, Timestamp.now()),
+                .json_appender = try JsonAppender.init(self.allocator, self.output, self.output_mutex, level, Timestamp.now()),
                 .logger = self,
             } });
         },
         .text => {
             return LogEntry.init(.{ .text = .{
-                .text_appender = try TextAppender.init(self.allocator, self.output, level, Timestamp.now()),
+                .text_appender = try TextAppender.init(self.allocator, self.output, self.output_mutex, level, Timestamp.now()),
                 .logger = self,
             } });
         },
@@ -380,14 +382,14 @@ test "logger - smoke test" {
     var werr = std.io.getStdErr().writer();
     const output: LogOutput = .{
         .writer = &werr,
-        .mutex = .{},
     };
+    var mtx: std.Thread.Mutex = .{};
 
     var json_logger = try Logger.init("json smoke test", allocator, .{
         .format = .json,
         .level = .debug,
         .output = output,
-    });
+    }, &mtx);
     defer json_logger.deinit();
 
     try _tst_smoke_logger(&json_logger);
@@ -396,7 +398,7 @@ test "logger - smoke test" {
         .format = .text,
         .level = .debug,
         .output = output,
-    });
+    }, &mtx);
     defer text_logger.deinit();
 
     try _tst_smoke_logger(&text_logger);

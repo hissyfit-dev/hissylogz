@@ -17,7 +17,6 @@ pub const LogFormat = enum {
 /// Logging output
 pub const LogOutput = struct {
     writer: *std.fs.File.Writer,
-    mutex: std.Thread.Mutex,
 };
 
 /// Logging level

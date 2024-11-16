@@ -31,8 +31,36 @@ pub fn main() !void {
         @as(i64, @intCast(@divFloor(no_op_time, std.time.ns_per_ms))),
     });
 
+    var threads: [10]std.Thread = undefined;
+
+    for (0..9) |tno| {
+        threads[tno] = try std.Thread.spawn(.{}, threadLogger, .{ allocator, tno });
+    }
+
+    for (0..9) |tno| {
+        std.Thread.join(threads[tno]);
+    }
+
     const one_two_three = try allocator.dupe(u8, "one two three");
     allocator.free(one_two_three);
+}
+
+fn threadLogger(allocator: std.mem.Allocator, tno: usize) void {
+    const logger_name = std.fmt.allocPrint(allocator, "tno-{d}", .{tno}) catch return;
+    defer allocator.free(logger_name);
+
+    const tid = std.Thread.getCurrentId();
+
+    var logger = hissylogz.globalLoggerPool().logger(logger_name);
+
+    for (0..5) |idx| {
+        logger.fine().msg("Fine entry").int("tid", tid).src(@src()).int("idx", idx).log();
+        logger.debug().msg("Debug entry").int("tid", tid).src(@src()).int("idx", idx).log();
+        logger.info().msg("Info entry").int("tid", tid).src(@src()).int("idx", idx).log();
+        logger.warn().msg("Warning entry").int("tid", tid).src(@src()).int("idx", idx).log();
+        logger.err().msg("Error entry").int("tid", tid).src(@src()).int("idx", idx).log();
+        logger.fatal().msg("Fatal error entry").int("tid", tid).src(@src()).int("idx", idx).log();
+    }
 }
 
 fn useGlobalLoggerPool() void {

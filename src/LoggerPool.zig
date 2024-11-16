@@ -21,6 +21,7 @@ const LoggerMap = std.StringArrayHashMap(*Logger);
 allocator: std.mem.Allocator,
 options: LogOptions,
 loggers: LoggerMap,
+output_mutex: *std.Thread.Mutex,
 rw_lock: std.Thread.RwLock,
 noop_logger: Logger,
 
@@ -30,19 +31,25 @@ pub fn init(allocator: std.mem.Allocator, options: LogOptions) AllocationError!S
         .level = .none,
         .output = options.output,
     };
-    const noop_logger = try Logger.init("no-op", allocator, noop_options);
+    const output_mutex = allocator.create(std.Thread.Mutex) catch return AllocationError.OutOfMemory;
+    errdefer allocator.destroy(output_mutex);
+    output_mutex.* = .{};
+
+    const noop_logger = try Logger.init("no-op", allocator, noop_options, output_mutex);
     errdefer noop_logger.deinit();
 
     return .{
         .allocator = allocator,
         .options = options,
         .loggers = LoggerMap.init(allocator),
+        .output_mutex = output_mutex,
         .rw_lock = .{},
         .noop_logger = noop_logger,
     };
 }
 
 pub fn deinit(self: *Self) void {
+    defer self.allocator.destroy(self.output_mutex);
     defer self.loggers.deinit();
     defer self.noop_logger.deinit();
     self.rw_lock.lock();
@@ -86,7 +93,7 @@ fn fetchOrAdd(self: *Self, name: []const u8) AllocationError!*Logger {
             return AllocationError.OutOfMemory;
         };
         errdefer self.allocator.destroy(new_logger);
-        new_logger.* = try Logger.init(name, self.allocator, self.options);
+        new_logger.* = try Logger.init(name, self.allocator, self.options, self.output_mutex);
         errdefer new_logger.deinit();
         gpr.value_ptr.* = new_logger;
     }
@@ -113,7 +120,6 @@ test "logger pool - smoke test" {
     var werr = std.io.getStdErr().writer();
     const output: LogOutput = .{
         .writer = &werr,
-        .mutex = .{},
     };
     const log_options: LogOptions = .{
         .format = .json,
