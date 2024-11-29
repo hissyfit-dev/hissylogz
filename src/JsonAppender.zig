@@ -101,7 +101,7 @@ pub fn ulid(self: *Self, key: []const u8, opt_value: ?Ulid) void {
         return;
     }
     var w = self.log_buffer.writer();
-    w.print("\"{s}\":{any},", .{ key, opt_value }) catch return;
+    w.print("\"{s}\":\"{any}\",", .{ key, opt_value }) catch return;
 }
 
 pub fn int(self: *Self, key: []const u8, value: anytype) void {
