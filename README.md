@@ -21,7 +21,7 @@ These are early days, and the feature set may grow, bugs will be found and fixed
 Let zig fetch the package and integrate it into your `build.zig.zon` automagically:
 
 ```shell
-zig fetch --save https://github.com/hissyfit-dev/hissylogz/archive/refs/tags/v0.0.5.tar.gz
+zig fetch --save https://github.com/hissyfit-dev/hissylogz/archive/refs/tags/v0.0.6.tar.gz
 ```
 
 ### Integrate into your build

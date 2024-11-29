@@ -17,6 +17,7 @@ pub const AllocationError = errors.AllocationError;
 pub const LogBuffer = @import("LogBuffer.zig");
 pub const Timestamp = constants.Timestamp;
 pub const LogLevel = constants.LogLevel;
+pub const Ulid = @import("hissybitz").ulid.Ulid;
 
 const Self = @This();
 
@@ -92,9 +93,9 @@ pub fn str(self: *Self, key: []const u8, opt_value: ?[]const u8) void {
         return;
     };
     var w = self.log_buffer.writer();
-    w.print("{s}=\"", .{key}) catch return;
+    w.print("{s}=", .{key}) catch return;
     std.json.encodeJsonString(value, .{}, w) catch return;
-    w.writeAll("\" ") catch return;
+    w.writeAll(" ") catch return;
 }
 
 pub fn strZ(self: *Self, key: []const u8, opt_value: ?[*:0]const u8) void {
@@ -103,6 +104,15 @@ pub fn strZ(self: *Self, key: []const u8, opt_value: ?[*:0]const u8) void {
         return;
     }
     self.str(key, std.mem.span(opt_value));
+}
+
+pub fn ulid(self: *Self, key: []const u8, opt_value: ?Ulid) void {
+    if (opt_value == null) {
+        self.writeNull(key);
+        return;
+    }
+    var w = self.log_buffer.writer();
+    w.print("{s}={any} ", .{ key, opt_value }) catch return;
 }
 
 pub fn int(self: *Self, key: []const u8, value: anytype) void {
@@ -123,6 +133,26 @@ pub fn int(self: *Self, key: []const u8, value: anytype) void {
 
     var w = self.log_buffer.writer();
     w.print("{s}={d} ", .{ key, int_val }) catch return;
+}
+
+pub fn intx(self: *Self, key: []const u8, value: anytype) void {
+    const int_val = switch (@typeInfo(@TypeOf(value))) {
+        .Optional => blk: {
+            if (value) |v| {
+                break :blk v;
+            }
+            self.writeNull(key);
+            return;
+        },
+        .Null => {
+            self.writeNull(key);
+            return;
+        },
+        else => value,
+    };
+
+    var w = self.log_buffer.writer();
+    w.print("{s}=0x{x} ", .{ key, int_val }) catch return;
 }
 
 pub fn float(self: *Self, key: []const u8, value: anytype) void {
@@ -183,7 +213,9 @@ pub fn obj(self: *Self, key: []const u8, value: anytype) void {
 
     var w = self.log_buffer.writer();
     w.print("{s}=", .{key}) catch return;
-    std.json.stringify(obj_val, .{}, w) catch return;
+    std.json.stringify(obj_val, .{}, w) catch {
+        w.print("{self}", .{key}) catch return;
+    };
     w.writeByte(' ') catch return;
 }
 
