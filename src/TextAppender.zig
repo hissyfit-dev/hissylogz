@@ -63,12 +63,8 @@ pub fn ctx(self: *Self, value: []const u8) void {
 }
 
 pub fn src(self: *Self, value: std.builtin.SourceLocation) void {
-    // self.writeObject("@src", .{ .file = value.file, .@"fn" = value.fn_name, .line = value.line });
-
     var w = self.log_buffer.writer();
-    w.print("@src={s}:{d}: {s} ", .{ value.file, value.line, value.fn_name }) catch return;
-
-    //src/TextAppender.zig:437:33: e
+    w.print("@src=\"{s}:{d}: {s}\" ", .{ value.file, value.line, value.fn_name }) catch return;
 }
 
 pub fn msg(self: *Self, opt_value: ?[]const u8) void {
@@ -84,7 +80,7 @@ pub fn name(self: *Self, opt_value: ?[]const u8) void {
         return;
     };
     var w = self.log_buffer.writer();
-    w.print("[{s}] ", .{value}) catch return;
+    w.print("[{s: <30}] ", .{value}) catch return;
 }
 
 pub fn str(self: *Self, key: []const u8, opt_value: ?[]const u8) void {
@@ -112,7 +108,7 @@ pub fn ulid(self: *Self, key: []const u8, opt_value: ?Ulid) void {
         return;
     }
     var w = self.log_buffer.writer();
-    w.print("{s}={any} ", .{ key, opt_value }) catch return;
+    w.print("{s}=\"{any}\" ", .{ key, opt_value }) catch return;
 }
 
 pub fn int(self: *Self, key: []const u8, value: anytype) void {
@@ -475,7 +471,7 @@ test "text appender - src" {
 
     const local_src = @src();
     json_appender.src(local_src);
-    try expectLogPostfixFmt(&json_appender, "@src=src/TextAppender.zig:{d}: test.text appender - src", .{local_src.line});
+    try expectLogPostfixFmt(&json_appender, "@src=\"src/TextAppender.zig:{d}: test.text appender - src\"", .{local_src.line});
 }
 
 fn expectLogPostfix(json_appender: *TextAppender, comptime expected: ?[]const u8) !void {

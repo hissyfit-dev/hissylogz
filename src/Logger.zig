@@ -19,6 +19,7 @@ pub const LogOutput = constants.LogOutput;
 pub const LogFormat = constants.LogFormat;
 pub const LogOptions = constants.LogOptions;
 pub const Timestamp = constants.Timestamp;
+pub const Ulid = @import("hissybitz").ulid.Ulid;
 
 const std_logger = std.log.scoped(.hissylogz_logger);
 
@@ -280,11 +281,29 @@ pub const LogEntry = struct {
         return self;
     }
 
+    pub inline fn ulid(self: *LogEntry, key: []const u8, opt_value: ?Ulid) *LogEntry {
+        switch (self.appender) {
+            .noop => {},
+            .json => |*jctx| jctx.json_appender.ulid(key, opt_value),
+            .text => |*tctx| tctx.text_appender.ulid(key, opt_value),
+        }
+        return self;
+    }
+
     pub inline fn int(self: *LogEntry, key: []const u8, value: anytype) *LogEntry {
         switch (self.appender) {
             .noop => {},
             .json => |*jctx| jctx.json_appender.int(key, value),
             .text => |*tctx| tctx.text_appender.int(key, value),
+        }
+        return self;
+    }
+
+    pub inline fn intx(self: *LogEntry, key: []const u8, value: anytype) *LogEntry {
+        switch (self.appender) {
+            .noop => {},
+            .json => |*jctx| jctx.json_appender.intx(key, value),
+            .text => |*tctx| tctx.text_appender.intx(key, value),
         }
         return self;
     }
@@ -426,6 +445,13 @@ fn _tst_smoke_logger(logger: *Logger) !void {
     logger.info().src(@src()).int("one", 1).log();
     logger.info().src(@src()).str("useful", "perhaps").log();
     logger.warn().str("dire", "warning").log();
+    logger.warn().intx("failures", 65).log();
+
+    const ulid = @import("hissybitz").ulid;
+    var id_gen = ulid.generator();
+    const id = try id_gen.next();
+
+    logger.warn().ulid("id", id).log();
 }
 
 // ---
