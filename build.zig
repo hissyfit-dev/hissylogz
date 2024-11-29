@@ -9,6 +9,11 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    const hissybitz = b.dependency("hissybitz", .{
+        .target = target,
+        .optimize = optimize,
+    });
+
     const hissylogz_lib = b.addStaticLibrary(.{
         .name = "hissylogz",
         .root_source_file = b.path("src/hissylogz.zig"),
@@ -16,6 +21,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     hissylogz_lib.root_module.addImport("datetime", datetime.module("datetime"));
+    hissylogz_lib.root_module.addImport("hissybitz", hissybitz.module("hissybitz"));
 
     b.installArtifact(hissylogz_lib);
 
@@ -23,7 +29,10 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/hissylogz.zig"),
         .target = target,
         .optimize = optimize,
-        .imports = &.{.{ .name = "datetime", .module = datetime.module("datetime") }},
+        .imports = &.{
+            .{ .name = "datetime", .module = datetime.module("datetime") },
+            .{ .name = "hissybitz", .module = hissybitz.module("hissybitz") },
+        },
     });
 
     const exe = b.addExecutable(.{
@@ -33,6 +42,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     exe.root_module.addImport("datetime", datetime.module("datetime"));
+    exe.root_module.addImport("hissybitz", hissybitz.module("hissybitz"));
     b.installArtifact(exe);
 
     const run_cmd = b.addRunArtifact(exe);
@@ -52,6 +62,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     hissylogz_lib_unit_tests.root_module.addImport("datetime", datetime.module("datetime"));
+    hissylogz_lib_unit_tests.root_module.addImport("hissybitz", hissybitz.module("hissybitz"));
 
     const run_hissylogz_lib_unit_tests = b.addRunArtifact(hissylogz_lib_unit_tests);
 
@@ -61,6 +72,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     exe_unit_tests.root_module.addImport("datetime", datetime.module("datetime"));
+    exe_unit_tests.root_module.addImport("hissybitz", hissybitz.module("hissybitz"));
 
     const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
 
