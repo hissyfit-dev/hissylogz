@@ -19,7 +19,7 @@ pub const LogOutput = constants.LogOutput;
 pub const LogFormat = constants.LogFormat;
 pub const LogOptions = constants.LogOptions;
 pub const Timestamp = constants.Timestamp;
-pub const Ulid = @import("hissybitz").ulid.Ulid;
+pub const Ulid = @import("ulid.zig").Ulid;
 
 const std_logger = std.log.scoped(.hissylogz_logger);
 
@@ -447,7 +447,7 @@ fn _tst_smoke_logger(logger: *Logger) !void {
     logger.warn().str("dire", "warning").log();
     logger.warn().intx("failures", 65).log();
 
-    const ulid = @import("hissybitz").ulid;
+    const ulid = @import("ulid.zig");
     var id_gen = ulid.generator();
     const id = try id_gen.next();
 

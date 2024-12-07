@@ -17,7 +17,7 @@ pub const AllocationError = errors.AllocationError;
 pub const LogBuffer = @import("LogBuffer.zig");
 pub const Timestamp = constants.Timestamp;
 pub const LogLevel = constants.LogLevel;
-pub const Ulid = @import("hissybitz").ulid.Ulid;
+pub const Ulid = @import("ulid.zig").Ulid;
 
 const Self = @This();
 
