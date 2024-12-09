@@ -61,12 +61,38 @@ fn threadLogger(logger_pool: *hissylogz.LoggerPool, allocator: std.mem.Allocator
     var logger = logger_pool.logger(logger_name);
 
     for (0..5) |idx| {
-        logger.fine().msg("Fine entry").int("tid", tid).src(@src()).int("idx", idx).log();
-        logger.debug().msg("Debug entry").int("tid", tid).src(@src()).int("idx", idx).log();
-        logger.info().msg("Info entry").int("tid", tid).src(@src()).int("idx", idx).log();
-        logger.warn().msg("Warning entry").int("tid", tid).src(@src()).int("idx", idx).log();
-        logger.err().msg("Error entry").int("tid", tid).src(@src()).int("idx", idx).log();
-        logger.fatal().msg("Fatal error entry").int("tid", tid).src(@src()).int("idx", idx).log();
+        logger.fine()
+            .msg("Fine entry")
+            .int("tid", tid)
+            .src(@src())
+            .intb("idx", idx)
+            .log();
+        logger.debug()
+            .msg("Debug entry")
+            .int("tid", tid)
+            .src(@src())
+            .intx("idx", idx)
+            .log();
+        logger.info()
+            .msg("Info entry")
+            .int("tid", tid)
+            .int("idx", idx)
+            .log();
+        logger.warn()
+            .msg("Warning entry")
+            .int("tid", tid)
+            .int("idx", idx)
+            .log();
+        logger.err()
+            .msg("Error entry")
+            .int("tid", tid)
+            .src(@src())
+            .int("idx", idx)
+            .log();
+        logger.fatal()
+            .msg("Fatal error entry")
+            .int("tid", tid)
+            .log();
     }
 }
 

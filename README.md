@@ -68,36 +68,6 @@ Such entries are "borrowed" from entry pools in loggers, and will be returned to
 > Gotcha: Do *not* use a `stdout` writer for logging in unit tests, use `stderr` instead.
 > See open Zig issue: [zig build test hangs if stdout included](https://github.com/ziglang/zig/issues/18111)
 
-### Using the global logger pool
-
-In your main module, initialize the global logger pool, e.g.
-
-```zig
-
-const std = @import("std");
-const debug = std.debug;
-const io = std.io;
-
-const hissylogz = @import("hissylogz");
-
-pub fn main() !void {
-    // Prepare allocator
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
-
-    // Prepare global logger pool
-    try hissylogz.initGlobalLoggerPool(allocator, .{
-        .writer = @constCast(&std.io.getStdErr().writer()),
-        .filter_level = .info,
-    });
-    defer hissylogz.deinitGlobalLoggerPool();
-
-    // Do your thing
-
-}
-```
-
 ### Using independent logger pools
 
 Prepare a logger pool for use:
@@ -135,12 +105,101 @@ Once you have a pool, you can "tear-off" loggers, and create entries at various 
 ```zig
 fn useLoggerPool(pool: *LoggerPool) void {
     var logger = pool.logger("my very own logger");
-    logger.debug().str("first", "Non-rendered entry").boolean("rendered", false).log();
-    logger.info()str("first", "Rendered entry").boolean("rendered", true).log();
-    logger.warn().src(@src()).str("another", "Another rendered entry").log();
+    logger.debug()
+        .str("first", "Non-rendered entry")
+        .boolean("rendered", false)
+        .log();
+    logger.info()
+        .str("first", "Rendered entry")
+        .boolean("rendered", true)
+        .log();
+    logger.warn()
+        .src(@src())
+        .str("another", "Another rendered entry")
+        .log();
 }
 
 ```
+
+A few silly examples:
+
+```zig
+
+for (0..5) |idx| {
+
+    // Log at fine level, include a source code reference, and with idx in binary
+    logger.fine()
+        .msg("Fine entry")
+        .src(@src())
+        .intb("idx", idx)
+        .log();
+
+    // Log at debug level, include a source code reference, and with idx in hexadecimal
+    logger.debug()
+        .msg("Debug entry")
+        .src(@src())
+        .intx("idx", idx)
+        .log();
+
+    // Log at info level, with idx in decimal
+    logger.info()
+        .msg("Info entry")
+        .int("idx", idx)
+        .log();
+
+    // Log at warning level, with idx in decimal
+    logger.warn()
+        .msg("Warning entry")
+        .int("idx", idx)
+        .log();
+
+    // Log at error level, with idx in decimal and an error enum name
+    doSomethingHorrible() catch |e| {
+        logger.err()
+            .msg("Error entry")
+            .err(e)
+            .int("idx", idx)
+            .log();
+    }
+
+    // Log a fatal message
+    logger.fatal()
+        .msg("Fatal error entry")
+        .log();
+}
+
+```
+
+### Using the global logger pool
+
+In your main module, initialize the global logger pool, e.g.
+
+```zig
+
+const std = @import("std");
+const debug = std.debug;
+const io = std.io;
+
+const hissylogz = @import("hissylogz");
+
+pub fn main() !void {
+    // Prepare allocator
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    // Prepare global logger pool
+    try hissylogz.initGlobalLoggerPool(allocator, .{
+        .writer = @constCast(&std.io.getStdErr().writer()),
+        .filter_level = .info,
+    });
+    defer hissylogz.deinitGlobalLoggerPool();
+
+    // Do your thing
+
+}
+```
+
 
 ## Dependencies
 
