@@ -4,6 +4,8 @@ const std = @import("std");
 const testing = std.testing;
 
 const constants = @import("constants.zig");
+const ulid = @import("ulid.zig");
+const Ulid = ulid.Ulid;
 
 pub const errors = @import("errors.zig");
 

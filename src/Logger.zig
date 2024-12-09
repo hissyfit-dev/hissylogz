@@ -19,7 +19,7 @@ pub const LogOutput = constants.LogOutput;
 pub const LogFormat = constants.LogFormat;
 pub const LogOptions = constants.LogOptions;
 pub const Timestamp = constants.Timestamp;
-pub const Ulid = @import("hissybitz").ulid.Ulid;
+pub const Ulid = @import("ulid.zig").Ulid;
 
 const std_logger = std.log.scoped(.hissylogz_logger);
 
@@ -308,6 +308,15 @@ pub const LogEntry = struct {
         return self;
     }
 
+    pub inline fn intb(self: *LogEntry, key: []const u8, value: anytype) *LogEntry {
+        switch (self.appender) {
+            .noop => {},
+            .json => |*jctx| jctx.json_appender.intb(key, value),
+            .text => |*tctx| tctx.text_appender.intb(key, value),
+        }
+        return self;
+    }
+
     pub inline fn float(self: *LogEntry, key: []const u8, value: anytype) *LogEntry {
         switch (self.appender) {
             .noop => {},
@@ -442,16 +451,35 @@ fn _tst_smoke_logger(logger: *Logger) !void {
     entry_1.log();
     entry_2.log();
 
-    logger.info().src(@src()).int("one", 1).log();
-    logger.info().src(@src()).str("useful", "perhaps").log();
-    logger.warn().str("dire", "warning").log();
-    logger.warn().intx("failures", 65).log();
+    logger.info()
+        .msg("Smoke testing ULID support")
+        .src(@src())
+        .int("one", 1)
+        .log();
+    logger.info()
+        .msg("Smoke testing ULID support")
+        .src(@src())
+        .str("useful", "perhaps")
+        .log();
+    logger.warn()
+        .msg("Smoke testing ULID support")
+        .str("dire", "warning")
+        .log();
+    logger.warn()
+        .msg("Smoke testing ULID support")
+        .intx("failures", 65)
+        .log();
 
-    const ulid = @import("hissybitz").ulid;
+    const ulid = @import("ulid.zig");
     var id_gen = ulid.generator();
     const id = try id_gen.next();
 
-    logger.warn().ulid("id", id).log();
+    const ulid_int: u128 = @bitCast(id);
+    logger.warn()
+        .msg("Smoke testing ULID support")
+        .ulid("ulid", id)
+        .intb("ulid_int", ulid_int)
+        .log();
 }
 
 // ---

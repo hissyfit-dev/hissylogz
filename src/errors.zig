@@ -25,6 +25,10 @@ pub const AccessError = error{
     OtherAccessError,
 };
 
+pub const StateError = error{
+    IllegalState,
+};
+
 // ---
 // hissylogz.
 //

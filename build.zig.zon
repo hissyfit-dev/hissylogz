@@ -1,15 +1,11 @@
 .{
     .name = "hissylogz",
-    .version = "0.0.7",
+    .version = "0.0.8",
     .paths = .{ "src", "build.zig", "build.zig.zon", "README.md", "LICENSE.md", "doc" },
     .dependencies = .{
         .datetime = .{
             .url = "https://github.com/clickingbuttons/datetime/archive/refs/tags/0.12.0.tar.gz",
             .hash = "1220d3317aa49c5fb480482ba5f17205432235aa5bbd6b7a3cc5024f4efd0a4555f5",
-        },
-        .hissybitz = .{
-            .url = "https://github.com/hissyfit-dev/hissybitz/archive/refs/tags/v0.0.1.tar.gz",
-            .hash = "122020b46c452f25323b48568d8c5be7c60f6a70fd855753a31a80eec34f6a75da12",
         },
     },
 }

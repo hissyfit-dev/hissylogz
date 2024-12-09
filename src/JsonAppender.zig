@@ -17,7 +17,7 @@ pub const AllocationError = errors.AllocationError;
 pub const LogBuffer = @import("LogBuffer.zig");
 pub const Timestamp = constants.Timestamp;
 pub const LogLevel = constants.LogLevel;
-pub const Ulid = @import("hissybitz").ulid.Ulid;
+pub const Ulid = @import("ulid.zig").Ulid;
 
 const Self = @This();
 
@@ -142,6 +142,26 @@ pub fn intx(self: *Self, key: []const u8, value: anytype) void {
 
     var w = self.log_buffer.writer();
     w.print("\"{s}\":0x{x},", .{ key, int_val }) catch return;
+}
+
+pub fn intb(self: *Self, key: []const u8, value: anytype) void {
+    const int_val = switch (@typeInfo(@TypeOf(value))) {
+        .Optional => blk: {
+            if (value) |v| {
+                break :blk v;
+            }
+            self.writeNull(key);
+            return;
+        },
+        .Null => {
+            self.writeNull(key);
+            return;
+        },
+        else => value,
+    };
+
+    var w = self.log_buffer.writer();
+    w.print("\"{s}\":0b{b},", .{ key, int_val }) catch return;
 }
 
 pub fn float(self: *Self, key: []const u8, value: anytype) void {
