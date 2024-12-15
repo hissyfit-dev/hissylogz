@@ -125,6 +125,7 @@ test "hissylogz - dependencies trigger" {
     };
     var json_appender = try JsonAppender.init(
         allocator,
+        "json",
         output,
         &mtx,
         .debug,
@@ -136,6 +137,7 @@ test "hissylogz - dependencies trigger" {
 
     var text_appender = try JsonAppender.init(
         allocator,
+        "text",
         output,
         &mtx,
         .debug,

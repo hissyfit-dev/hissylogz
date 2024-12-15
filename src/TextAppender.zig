@@ -4,6 +4,7 @@
 //! Although this appender is not itself thread-safe, via `Logger`, appenders (like this one) will be managed in a thread-safe pool.
 
 const std = @import("std");
+const builtin = @import("builtin");
 const assert = std.debug.assert;
 const testing = std.testing;
 
@@ -40,8 +41,10 @@ output_mutex: *std.Thread.Mutex,
 log_buffer: LogBuffer,
 level: LogLevel,
 log_time: LogTime,
+tid: std.Thread.Id,
+log_name: []const u8,
 
-pub fn init(allocator: std.mem.Allocator, output: Output, output_mutex: *std.Thread.Mutex, level: LogLevel, log_time: LogTime) AllocationError!Self {
+pub fn init(allocator: std.mem.Allocator, log_name: []const u8, output: Output, output_mutex: *std.Thread.Mutex, level: LogLevel, log_time: LogTime) AllocationError!Self {
     init_names_once.call();
     var new_log_buffer = try LogBuffer.init(allocator);
     errdefer new_log_buffer.deinit();
@@ -53,6 +56,8 @@ pub fn init(allocator: std.mem.Allocator, output: Output, output_mutex: *std.Thr
         .log_buffer = new_log_buffer,
         .level = level,
         .log_time = log_time,
+        .log_name = log_name,
+        .tid = std.Thread.getCurrentId(),
     };
 }
 
@@ -62,6 +67,7 @@ pub fn deinit(self: *Self) void {
 
 pub fn reset(self: *Self, log_time: LogTime) void {
     self.log_time = log_time;
+    self.tid = std.Thread.getCurrentId();
     self.log_buffer.reset();
 }
 
@@ -87,8 +93,7 @@ pub fn name(self: *Self, opt_value: ?[]const u8) void {
     const value = opt_value orelse {
         return;
     };
-    var w = self.log_buffer.writer();
-    w.print("[{s: <30}] ", .{value}) catch return;
+    self.log_name = value;
 }
 
 pub fn str(self: *Self, key: []const u8, opt_value: ?[]const u8) void {
@@ -327,9 +332,12 @@ fn logTo(self: *Self, writer: anytype) AccessError!void {
     defer self.output_mutex.unlock();
 
     // Write log entry
-    nosuspend writer.print("{rfc3339} {s: >5}: {s}\n", .{
+    const tid = std.Thread.getCurrentId();
+    nosuspend writer.print("{rfc3339} {s: >5} [{s: <20} ({d})]: {s}\n", .{
         self.log_time,
         log_level_names[@intFromEnum(self.level)],
+        self.log_name,
+        tid,
         out_buffer[0 .. out_buffer.len - 1], // skip trailing space (' ')
     }) catch |e| {
         std.debug.print("Access error writing log entry: {any}\n", .{e});
@@ -365,7 +373,14 @@ test "text appender - binary" {
         .writer = &werr,
     };
     var mtx: std.Thread.Mutex = .{};
-    var text_appender = try TextAppender.init(allocator, appender_output, &mtx, .debug, LogTime.now());
+    var text_appender = try TextAppender.init(
+        allocator,
+        "text",
+        appender_output,
+        &mtx,
+        .debug,
+        LogTime.now(),
+    );
     defer text_appender.deinit();
 
     const unencoded = [_]u8{ 'b', 'i', 'n', 'a', 'r', 'y' };
@@ -397,7 +412,14 @@ test "text appender - int" {
         .writer = &werr,
     };
     var mtx: std.Thread.Mutex = .{};
-    var text_appender = try TextAppender.init(allocator, appender_output, &mtx, .debug, LogTime.now());
+    var text_appender = try TextAppender.init(
+        allocator,
+        "text",
+        appender_output,
+        &mtx,
+        .debug,
+        LogTime.now(),
+    );
     defer text_appender.deinit();
 
     text_appender.int("key", 0);
@@ -425,7 +447,14 @@ test "text appender - boolean" {
         .writer = &werr,
     };
     var mtx: std.Thread.Mutex = .{};
-    var text_appender = try TextAppender.init(allocator, appender_output, &mtx, .debug, LogTime.now());
+    var text_appender = try TextAppender.init(
+        allocator,
+        "text",
+        appender_output,
+        &mtx,
+        .debug,
+        LogTime.now(),
+    );
     defer text_appender.deinit();
 
     text_appender.boolean("cats", true);
@@ -447,7 +476,14 @@ test "text appender - float" {
         .writer = &werr,
     };
     var mtx: std.Thread.Mutex = .{};
-    var text_appender = try TextAppender.init(allocator, appender_output, &mtx, .debug, LogTime.now());
+    var text_appender = try TextAppender.init(
+        allocator,
+        "text",
+        appender_output,
+        &mtx,
+        .debug,
+        LogTime.now(),
+    );
     defer text_appender.deinit();
 
     text_appender.float("key", 0);
@@ -475,7 +511,14 @@ test "text appender - error" {
         .writer = &werr,
     };
     var mtx: std.Thread.Mutex = .{};
-    var text_appender = try TextAppender.init(allocator, appender_output, &mtx, .debug, LogTime.now());
+    var text_appender = try TextAppender.init(
+        allocator,
+        "text",
+        appender_output,
+        &mtx,
+        .debug,
+        LogTime.now(),
+    );
     defer text_appender.deinit();
 
     text_appender.errK("errK", error.OutOfMemory);
@@ -494,7 +537,14 @@ test "text appender - ctx" {
         .writer = &werr,
     };
     var mtx: std.Thread.Mutex = .{};
-    var text_appender = try TextAppender.init(allocator, appender_output, &mtx, .debug, LogTime.now());
+    var text_appender = try TextAppender.init(
+        allocator,
+        "text",
+        appender_output,
+        &mtx,
+        .debug,
+        LogTime.now(),
+    );
     defer text_appender.deinit();
 
     text_appender.ctx("some context");
@@ -510,7 +560,14 @@ test "text appender - src" {
         .writer = &werr,
     };
     var mtx: std.Thread.Mutex = .{};
-    var text_appender = try TextAppender.init(allocator, appender_output, &mtx, .debug, LogTime.now());
+    var text_appender = try TextAppender.init(
+        allocator,
+        "text",
+        appender_output,
+        &mtx,
+        .debug,
+        LogTime.now(),
+    );
     defer text_appender.deinit();
 
     const local_src = @src();
@@ -550,7 +607,9 @@ fn expectLogPostfixFmt(text_appender: *TextAppender, comptime format: []const u8
 fn extractPostfix(text: []const u8) []const u8 {
     const ts_len = 30 - 3;
     const level_len = @tagName(default_logging_level).len;
-    const prefix_len = ts_len + 1 + level_len + 2;
+    const tid_len = 8;
+    const name_len = 20 + 3;
+    const prefix_len = ts_len + 1 + level_len + 2 + tid_len + name_len + 2 + 1;
     if (text.len <= prefix_len) {
         return text;
     }

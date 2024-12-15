@@ -16,20 +16,17 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    try hissylogz.initGlobalLoggerPool(allocator, .{
-        .writer = @constCast(&std.io.getStdOut().writer()),
-        .filter_level = .info,
-    });
+    try hissylogz.initGlobalLoggerPool(allocator, .{ .writer = @constCast(&std.io.getStdOut().writer()), .filter_level = .info, .log_format = .text });
     defer hissylogz.deinitGlobalLoggerPool();
 
-    useGlobalLoggerPool();
+    var logger = hissylogz.globalLoggerPool().logger("hissylogz");
 
     const no_op_time = try timeNoopLogging(hissylogz.globalLoggerPool());
-    std.debug.print("no-op logging 10,000 times: {d}ns ({d}μs) ({d}ms)\n", .{
-        no_op_time,
-        @as(i64, @intCast(@divFloor(no_op_time, std.time.ns_per_us))),
-        @as(i64, @intCast(@divFloor(no_op_time, std.time.ns_per_ms))),
-    });
+    logger.info()
+        .msg("no-op logging")
+        .int("times", 10_000)
+        .int("nanoseconds", no_op_time)
+        .log();
 
     var thread_logger_pool = try hissylogz.loggerPool(allocator, .{
         .filter_level = .fine,
@@ -47,63 +44,42 @@ pub fn main() !void {
     for (0..9) |tno| {
         std.Thread.join(threads[tno]);
     }
-
-    const one_two_three = try allocator.dupe(u8, "one two three");
-    allocator.free(one_two_three);
 }
 
 fn threadLogger(logger_pool: *hissylogz.LoggerPool, allocator: std.mem.Allocator, tno: usize) void {
     const logger_name = std.fmt.allocPrint(allocator, "tno-{d}", .{tno}) catch return;
     defer allocator.free(logger_name);
 
-    const tid = std.Thread.getCurrentId();
-
     var logger = logger_pool.logger(logger_name);
 
     for (0..5) |idx| {
         logger.fine()
             .msg("Fine entry")
-            .int("tid", tid)
             .src(@src())
             .intb("idx", idx)
             .log();
         logger.debug()
             .msg("Debug entry")
-            .int("tid", tid)
             .src(@src())
             .intx("idx", idx)
             .log();
         logger.info()
             .msg("Info entry")
-            .int("tid", tid)
             .int("idx", idx)
             .log();
         logger.warn()
             .msg("Warning entry")
-            .int("tid", tid)
             .int("idx", idx)
             .log();
         logger.err()
             .msg("Error entry")
-            .int("tid", tid)
             .src(@src())
             .int("idx", idx)
             .log();
         logger.fatal()
             .msg("Fatal error entry")
-            .int("tid", tid)
             .log();
     }
-}
-
-fn useGlobalLoggerPool() void {
-    var logger = hissylogz.globalLoggerPool().logger("useGlobalLoggerPool");
-    logger.fine().msg("Fine entry").src(@src()).str("first", "Hidden entry").int("entry#", 1).boolean("appears", false).log();
-    logger.debug().msg("Debug entry").src(@src()).str("second", "Hidden entry").int("entry#", 2).boolean("appears", false).log();
-    logger.info().msg("Informational entry").src(@src()).str("third", "Visible entry").int("entry#", 3).boolean("appears", true).log();
-    logger.warn().msg("Warning entry").src(@src()).str("fourth", "Another visible entry").int("entry#", 4).boolean("appears", true).log();
-    logger.err().msg("Error entry").src(@src()).str("fifth", "Yet another visible entry").int("entry#", 5).boolean("appears", true).log();
-    logger.fatal().msg("Fatal error entry").src(@src()).str("sixth", "Yet another visible entry").int("entry#", 6).boolean("appears", true).log();
 }
 
 fn timeNoopLogging(pool: *LoggerPool) !u64 {

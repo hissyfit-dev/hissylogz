@@ -1,4 +1,4 @@
-# hissylogz (Module `hissylogz`)
+# hissylogz
 
 Structured logging support for Zig, enjoy, or my cat may hiss at you.
 

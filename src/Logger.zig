@@ -88,33 +88,27 @@ pub fn deinit(self: *Self) void {
 }
 
 pub inline fn fine(self: *Self) *LogEntry {
-    var le = acquireEntry(self, .fine) catch return &noop_log_entry;
-    return le.name(self.name);
+    return acquireEntry(self, .fine) catch return &noop_log_entry;
 }
 
 pub inline fn debug(self: *Self) *LogEntry {
-    var le = acquireEntry(self, .debug) catch return &noop_log_entry;
-    return le.name(self.name);
+    return acquireEntry(self, .debug) catch return &noop_log_entry;
 }
 
 pub inline fn info(self: *Self) *LogEntry {
-    var le = acquireEntry(self, .info) catch return &noop_log_entry;
-    return le.name(self.name);
+    return acquireEntry(self, .info) catch return &noop_log_entry;
 }
 
 pub inline fn warn(self: *Self) *LogEntry {
-    var le = acquireEntry(self, .warn) catch return &noop_log_entry;
-    return le.name(self.name);
+    return acquireEntry(self, .warn) catch return &noop_log_entry;
 }
 
 pub inline fn err(self: *Self) *LogEntry {
-    var le = acquireEntry(self, .err) catch return &noop_log_entry;
-    return le.name(self.name);
+    return acquireEntry(self, .err) catch return &noop_log_entry;
 }
 
 pub inline fn fatal(self: *Self) *LogEntry {
-    var le = acquireEntry(self, .fatal) catch return &noop_log_entry;
-    return le.name(self.name);
+    return acquireEntry(self, .fatal) catch return &noop_log_entry;
 }
 
 fn acquireEntry(self: *Self, level: LogLevel) AllocationError!*LogEntry {
@@ -158,13 +152,27 @@ fn createLogEntry(self: *Self, level: LogLevel) AllocationError!LogEntry {
     return switch (self.format) {
         .json => {
             return LogEntry.init(.{ .json = .{
-                .json_appender = try JsonAppender.init(self.allocator, self.output, self.output_mutex, level, LogTime.init(self.ns_ts_supplier())),
+                .json_appender = try JsonAppender.init(
+                    self.allocator,
+                    self.name,
+                    self.output,
+                    self.output_mutex,
+                    level,
+                    LogTime.init(self.ns_ts_supplier()),
+                ),
                 .logger = self,
             } });
         },
         .text => {
             return LogEntry.init(.{ .text = .{
-                .text_appender = try TextAppender.init(self.allocator, self.output, self.output_mutex, level, LogTime.init(self.ns_ts_supplier())),
+                .text_appender = try TextAppender.init(
+                    self.allocator,
+                    self.name,
+                    self.output,
+                    self.output_mutex,
+                    level,
+                    LogTime.init(self.ns_ts_supplier()),
+                ),
                 .logger = self,
             } });
         },
