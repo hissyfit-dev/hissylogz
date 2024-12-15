@@ -40,12 +40,14 @@ pub const LogLevel = enum(u3) {
         return null;
     }
 };
+pub const num_log_levels = @typeInfo(LogLevel).Enum.fields.len - 1; // .none doesn't count
 
 /// Logging options
 pub const LogOptions = struct {
     level: LogLevel = .info,
     format: LogFormat = .json,
     output: LogOutput,
+    ns_ts_supplier: *const fn () i128,
 };
 
 // ---

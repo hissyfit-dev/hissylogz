@@ -32,9 +32,9 @@ output: Output,
 output_mutex: *std.Thread.Mutex,
 log_buffer: LogBuffer,
 level: LogLevel,
-timestamp: LogTime,
+log_time: LogTime,
 
-pub fn init(allocator: std.mem.Allocator, output: Output, output_mutex: *std.Thread.Mutex, level: LogLevel, timestamp: LogTime) AllocationError!Self {
+pub fn init(allocator: std.mem.Allocator, output: Output, output_mutex: *std.Thread.Mutex, level: LogLevel, log_time: LogTime) AllocationError!Self {
     var new_log_buffer = try LogBuffer.init(allocator);
     errdefer new_log_buffer.deinit();
 
@@ -44,7 +44,7 @@ pub fn init(allocator: std.mem.Allocator, output: Output, output_mutex: *std.Thr
         .output_mutex = output_mutex,
         .log_buffer = new_log_buffer,
         .level = level,
-        .timestamp = timestamp,
+        .log_time = log_time,
     };
 }
 
@@ -52,8 +52,8 @@ pub fn deinit(self: *Self) void {
     self.log_buffer.deinit();
 }
 
-pub fn reset(self: *Self) void {
-    self.timestamp = LogTime.now();
+pub fn reset(self: *Self, log_time: LogTime) void {
+    self.log_time = log_time;
     self.log_buffer.reset();
 }
 
@@ -312,7 +312,7 @@ fn logTo(self: *Self, writer: anytype) AccessError!void {
 
     // Write log entry
     nosuspend writer.print("{{\"@ts\":\"{rfc3339}\",\"@lvl\":\"{s}\",{s}}}\n", .{
-        self.timestamp,
+        self.log_time,
         @tagName(self.level),
         out_buffer[0 .. out_buffer.len - 1],
     }) catch |e| {
@@ -644,11 +644,11 @@ fn expectLogPostfix(json_appender: *JsonAppender, comptime expected: ?[]const u8
     } else {
         try std.testing.expectEqual(0, out.items.len);
     }
-    json_appender.reset();
+    json_appender.reset(LogTime.now());
 }
 
 fn expectLogPostfixFmt(json_appender: *JsonAppender, comptime format: []const u8, args: anytype) !void {
-    defer json_appender.reset();
+    defer json_appender.reset(LogTime.now());
 
     var out = std.ArrayList(u8).init(std.testing.allocator);
     try out.ensureTotalCapacity(100);
@@ -659,7 +659,7 @@ fn expectLogPostfixFmt(json_appender: *JsonAppender, comptime format: []const u8
     var buf: [200]u8 = undefined;
     const expected = try std.fmt.bufPrint(&buf, format, args);
     try std.testing.expectEqualStrings(expected, extractPostfix(out.items));
-    json_appender.reset();
+    json_appender.reset(LogTime.now());
 }
 
 fn extractPostfix(text: []const u8) []const u8 {

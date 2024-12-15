@@ -26,10 +26,16 @@ rw_lock: std.Thread.RwLock,
 noop_logger: Logger,
 
 pub fn init(allocator: std.mem.Allocator, options: LogOptions) AllocationError!Self {
+    const noop_ts_supplier = struct {
+        fn supply() i128 {
+            return 0;
+        }
+    };
     const noop_options: LogOptions = .{
         .format = options.format,
         .level = .none,
         .output = options.output,
+        .ns_ts_supplier = noop_ts_supplier.supply,
     };
     const output_mutex = allocator.create(std.Thread.Mutex) catch return AllocationError.OutOfMemory;
     errdefer allocator.destroy(output_mutex);
@@ -125,6 +131,7 @@ test "logger pool - smoke test" {
         .format = .json,
         .level = .debug,
         .output = output,
+        .ns_ts_supplier = std.time.nanoTimestamp,
     };
 
     var logger_pool = try LoggerPool.init(allocator, log_options);

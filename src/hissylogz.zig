@@ -31,13 +31,19 @@ pub const Options = struct {
     filter_level: LogLevel = .info,
     log_format: LogFormat = .json,
     writer: *std.fs.File.Writer,
+    ns_ts_supplier: *const fn () i128 = std.time.nanoTimestamp,
 };
 
 pub fn loggerPool(allocator: std.mem.Allocator, options: Options) errors.AllocationError!LoggerPool {
     const output: constants.LogOutput = .{
         .writer = options.writer,
     };
-    const log_options: LogOptions = .{ .output = output, .format = options.log_format, .level = options.filter_level };
+    const log_options: LogOptions = .{
+        .output = output,
+        .format = options.log_format,
+        .level = options.filter_level,
+        .ns_ts_supplier = options.ns_ts_supplier,
+    };
     return try LoggerPool.init(allocator, log_options);
 }
 
@@ -142,6 +148,7 @@ test "hissylogz - dependencies trigger" {
         .format = .json,
         .level = .debug,
         .output = output,
+        .ns_ts_supplier = std.time.nanoTimestamp,
     };
 
     var logger = try Logger.init("logging", allocator, log_options, &mtx);
