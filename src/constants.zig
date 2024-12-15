@@ -50,6 +50,7 @@ pub const LogOptions = struct {
     ns_ts_supplier: *const fn () i128,
 };
 
+
 // ---
 // hissylogz.
 //

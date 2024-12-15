@@ -19,6 +19,13 @@ pub const LogLevel = constants.LogLevel;
 pub const LogTime = @import("LogTime.zig");
 pub const Ulid = @import("ulid.zig").Ulid;
 
+/// Case to use for log level
+pub const LogLevelNameCase = enum {
+    upper,
+    lower,
+};
+pub var log_level_name_case: LogLevelNameCase = .upper;
+
 const Self = @This();
 
 const std_logger = std.log.scoped(.hissylogz_text_appender);
@@ -35,6 +42,7 @@ level: LogLevel,
 log_time: LogTime,
 
 pub fn init(allocator: std.mem.Allocator, output: Output, output_mutex: *std.Thread.Mutex, level: LogLevel, log_time: LogTime) AllocationError!Self {
+    init_names_once.call();
     var new_log_buffer = try LogBuffer.init(allocator);
     errdefer new_log_buffer.deinit();
 
@@ -321,13 +329,29 @@ fn logTo(self: *Self, writer: anytype) AccessError!void {
     // Write log entry
     nosuspend writer.print("{rfc3339} {s: >5}: {s}\n", .{
         self.log_time,
-        @tagName(self.level),
+        log_level_names[@intFromEnum(self.level)],
         out_buffer[0 .. out_buffer.len - 1], // skip trailing space (' ')
     }) catch |e| {
         std.debug.print("Access error writing log entry: {any}\n", .{e});
         std_logger.err("Access error writing log entry: {any}\n", .{e});
         return AccessError.AccessFailure;
     };
+}
+
+// This once-per-lifetime function should be invoked using `init_names_once.call()`
+var init_names_once = std.once(initLogLevelNames);
+var log_level_names: [constants.num_log_levels][]const u8 = undefined;
+var llnb: [constants.num_log_levels][7]u8 = undefined;
+fn initLogLevelNames() void {
+    const fn_convert: *const fn (output: []u8, ascii_string: []const u8) []u8 = switch (log_level_name_case) {
+        .upper => std.ascii.upperString,
+        .lower => std.ascii.lowerString,
+    };
+
+    for (0..constants.num_log_levels) |idx| {
+        const tag_name = @tagName(@as(LogLevel, @enumFromInt(idx)));
+        log_level_names[idx] = fn_convert(llnb[idx][0..tag_name.len], tag_name);
+    }
 }
 
 const TextAppender = @This();
