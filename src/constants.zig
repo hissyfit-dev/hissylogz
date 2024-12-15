@@ -4,10 +4,6 @@ const std = @import("std");
 
 pub const hissylogz_version: std.SemanticVersion = .{ .major = 0, .minor = 0, .patch = 1 };
 
-/// Timestamp
-const datetime = @import("datetime");
-pub const Timestamp = datetime.datetime.Advanced(datetime.Date, datetime.time.Nano, false);
-
 /// Logging format
 pub const LogFormat = enum {
     json,

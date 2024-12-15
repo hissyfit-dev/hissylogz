@@ -18,7 +18,7 @@ pub const LogLevel = constants.LogLevel;
 pub const LogOutput = constants.LogOutput;
 pub const LogFormat = constants.LogFormat;
 pub const LogOptions = constants.LogOptions;
-pub const Timestamp = constants.Timestamp;
+pub const LogTime = @import("LogTime.zig");
 pub const Ulid = @import("ulid.zig").Ulid;
 
 const std_logger = std.log.scoped(.hissylogz_logger);
@@ -157,13 +157,13 @@ fn createLogEntry(self: *Self, level: LogLevel) AllocationError!LogEntry {
     return switch (self.format) {
         .json => {
             return LogEntry.init(.{ .json = .{
-                .json_appender = try JsonAppender.init(self.allocator, self.output, self.output_mutex, level, Timestamp.now()),
+                .json_appender = try JsonAppender.init(self.allocator, self.output, self.output_mutex, level, LogTime.now()),
                 .logger = self,
             } });
         },
         .text => {
             return LogEntry.init(.{ .text = .{
-                .text_appender = try TextAppender.init(self.allocator, self.output, self.output_mutex, level, Timestamp.now()),
+                .text_appender = try TextAppender.init(self.allocator, self.output, self.output_mutex, level, LogTime.now()),
                 .logger = self,
             } });
         },

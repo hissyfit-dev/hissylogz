@@ -4,8 +4,11 @@ Structured logging support for Zig, enjoy, or my cat may hiss at you.
 
 I created a miniature logging framework to satisfy my immediate needs:
 - Simple, low ceremony logging
-- Out-of-the-box log output friendly to cloud deployments (EKS, LOKI, etc) and log scrapers
 - Thread-safe, yet performant with efficient resource usage
+- Out-of-the-box log output friendly to cloud deployments (EKS, LOKI, etc) and log scrapers
+- [ULID](https://github.com/ulid/spec) (Universally Unique Lexicographically Sortable Identifiers) support
+    - `Ulid` type
+    - `Ulid` generator
 
 Non-goals:
 - Do everything (loading config from various sources, have rolling file appenders, etc)
@@ -21,7 +24,7 @@ These are early days, and the feature set may grow, bugs will be found and fixed
 Let zig fetch the package and integrate it into your `build.zig.zon` automagically:
 
 ```shell
-zig fetch --save https://github.com/hissyfit-dev/hissylogz/archive/refs/tags/v0.0.9.tar.gz
+zig fetch --save https://github.com/hissyfit-dev/hissylogz/archive/refs/tags/v0.0.10.tar.gz
 ```
 
 ### Integrate into your build
@@ -200,6 +203,39 @@ pub fn main() !void {
 }
 ```
 
+### ULIDs
+
+I added `ULID` support for immediate needs, but it may be useful nonetheless.
+
+- `Ulid` struct and `Generator`.
+    - The `Ulid` struct is packed such that it is trivially bit-castable to `u128` or `[16]u8`.
+    - Maintains monotonic sort order (correctly detects and handles the same millisecond) per `generator`.
+
+> For all-singing, all-dancing ULID support, consider [ulid-zig](https://github.com/rsepassi/ulid-zig).
+
+
+```zig
+
+const hissylogz = @import("hissylogz");
+const ulid = hissylogz.ulid;
+
+pub fn main() !void {
+
+    var gen = ulid.generator();
+
+    const ulid_0 = try gen.next();
+    const ulid_1 = try gen.next();
+
+    const str = ulid_0.encode();
+    const ulid_from_str = try ulid.decode(&str);
+
+    const bytes = ulid_0.bytes();
+    const ulid_from_bytes = try ulid.fromBytes(&bytes);
+
+}
+
+```
+
 
 ## Dependencies
 
@@ -212,6 +248,10 @@ This module uses [`datetime`](https://github.com/clickingbuttons/datetime) for t
 ## Acknowledgements
 
 I drew inspiration for the logger/entry API from [`log.zig`](https://github.com/karlseguin/log.zig).
+
+I re-purposed bits lifted from [ulid-zig](https://github.com/rsepassi/ulid-zig) under 0BSD.
+This is a solid library and comes with plenty of bells and whistles, a nice C ABI, the works.
+I've added known error sets, and a heavily trimmed down, restructured API.
 
 ## License
 

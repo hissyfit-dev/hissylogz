@@ -13,6 +13,7 @@ pub const LogLevel = constants.LogLevel;
 pub const LogFormat = constants.LogFormat;
 pub const LogOutput = constants.LogOutput;
 pub const LogOptions = constants.LogOptions;
+pub const LogTime = @import("LogTime.zig");
 
 pub const Logger = @import("Logger.zig");
 pub const LoggerPool = @import("LoggerPool.zig");
@@ -116,12 +117,24 @@ test "hissylogz - dependencies trigger" {
     const output: LogOutput = .{
         .writer = &w,
     };
-    var json_appender = try JsonAppender.init(allocator, output, &mtx, .debug, constants.Timestamp.now());
+    var json_appender = try JsonAppender.init(
+        allocator,
+        output,
+        &mtx,
+        .debug,
+        LogTime.now(),
+    );
     defer json_appender.deinit();
 
     std.debug.print("\ttext appender\n", .{});
 
-    var text_appender = try TextAppender.init(allocator, output, &mtx, .debug, constants.Timestamp.now());
+    var text_appender = try JsonAppender.init(
+        allocator,
+        output,
+        &mtx,
+        .debug,
+        LogTime.now(),
+    );
     defer text_appender.deinit();
 
     std.debug.print("\tlogger\n", .{});
