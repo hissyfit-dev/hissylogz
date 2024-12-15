@@ -124,7 +124,7 @@ fn useLoggerPool(pool: *LoggerPool) void {
 
 ```
 
-A few silly examples:
+A few trivial examples:
 
 ```zig
 
@@ -173,7 +173,33 @@ for (0..5) |idx| {
 
 ```
 
-### Using the global logger pool
+### The source of timestamps may be overridden
+
+`LogOptions.ns_ts_supplier` defaults to the system's nanosecond-precision timestamp supplier.
+If running a simulator with accellerated time, for example, you can provide your own, e.g.
+
+Given a `simulator` package with a function having the signature:
+```zig
+pub fn virtualNanosSinceEpoch() i128
+```
+
+We can use the simulator's virtual timestamps as follows:
+
+```zig
+
+    const sim = @import("simulator");
+
+    var log_options: LogOptions = .{
+        // other overrides
+        // ...
+        // now provide our timestamp supplier
+        .ns_ts_supplier = sim.virtualNanosSinceEpoch,
+    };
+
+```
+
+
+### Using the global logger pool (optional)
 
 In your main module, initialize the global logger pool, e.g.
 
@@ -205,7 +231,7 @@ pub fn main() !void {
 
 ### ULIDs
 
-I added `ULID` support for immediate needs, but it may be useful nonetheless.
+I added [ULID](https://github.com/ulid/spec) support for logging needs, but it may be useful by itself.
 
 - `Ulid` struct and `Generator`.
     - The `Ulid` struct is packed such that it is trivially bit-castable to `u128` or `[16]u8`.
