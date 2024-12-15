@@ -18,7 +18,7 @@ pub const LogLevel = constants.LogLevel;
 pub const LogOutput = constants.LogOutput;
 pub const LogFormat = constants.LogFormat;
 pub const LogOptions = constants.LogOptions;
-pub const Timestamp = constants.Timestamp;
+pub const LogTime = @import("LogTime.zig");
 pub const Ulid = @import("ulid.zig").Ulid;
 
 const std_logger = std.log.scoped(.hissylogz_logger);
@@ -27,8 +27,7 @@ const Self = @This();
 
 const LogEntryPool = std.ArrayList(*LogEntry);
 
-const num_log_levels = 6;
-// const num_log_levels = @typeInfo(LogLevel).@"enum".fields.len; // FIXME - Something along these lines
+const num_log_levels = constants.num_log_levels;
 
 name: []const u8,
 allocator: std.mem.Allocator,
@@ -38,6 +37,7 @@ output: LogOutput,
 output_mutex: *std.Thread.Mutex,
 format: LogFormat,
 level: LogLevel,
+ns_ts_supplier: *const fn () i128,
 level_filter_ordinal: u3,
 
 pub fn init(name: []const u8, allocator: std.mem.Allocator, options: LogOptions, output_mutex: *std.Thread.Mutex) AllocationError!Self {
@@ -66,6 +66,7 @@ pub fn init(name: []const u8, allocator: std.mem.Allocator, options: LogOptions,
         .level = options.level,
         .output_mutex = output_mutex,
         .format = options.format,
+        .ns_ts_supplier = options.ns_ts_supplier,
         .level_filter_ordinal = level_filter_ordinal,
     };
 }
@@ -87,33 +88,27 @@ pub fn deinit(self: *Self) void {
 }
 
 pub inline fn fine(self: *Self) *LogEntry {
-    var le = acquireEntry(self, .fine) catch return &noop_log_entry;
-    return le.name(self.name);
+    return acquireEntry(self, .fine) catch return &noop_log_entry;
 }
 
 pub inline fn debug(self: *Self) *LogEntry {
-    var le = acquireEntry(self, .debug) catch return &noop_log_entry;
-    return le.name(self.name);
+    return acquireEntry(self, .debug) catch return &noop_log_entry;
 }
 
 pub inline fn info(self: *Self) *LogEntry {
-    var le = acquireEntry(self, .info) catch return &noop_log_entry;
-    return le.name(self.name);
+    return acquireEntry(self, .info) catch return &noop_log_entry;
 }
 
 pub inline fn warn(self: *Self) *LogEntry {
-    var le = acquireEntry(self, .warn) catch return &noop_log_entry;
-    return le.name(self.name);
+    return acquireEntry(self, .warn) catch return &noop_log_entry;
 }
 
 pub inline fn err(self: *Self) *LogEntry {
-    var le = acquireEntry(self, .err) catch return &noop_log_entry;
-    return le.name(self.name);
+    return acquireEntry(self, .err) catch return &noop_log_entry;
 }
 
 pub inline fn fatal(self: *Self) *LogEntry {
-    var le = acquireEntry(self, .fatal) catch return &noop_log_entry;
-    return le.name(self.name);
+    return acquireEntry(self, .fatal) catch return &noop_log_entry;
 }
 
 fn acquireEntry(self: *Self, level: LogLevel) AllocationError!*LogEntry {
@@ -138,7 +133,7 @@ fn acquireEntry(self: *Self, level: LogLevel) AllocationError!*LogEntry {
         return new_entry;
     };
 
-    entry.reset();
+    entry.reset(LogTime.init(self.ns_ts_supplier()));
     return entry;
 }
 
@@ -157,13 +152,27 @@ fn createLogEntry(self: *Self, level: LogLevel) AllocationError!LogEntry {
     return switch (self.format) {
         .json => {
             return LogEntry.init(.{ .json = .{
-                .json_appender = try JsonAppender.init(self.allocator, self.output, self.output_mutex, level, Timestamp.now()),
+                .json_appender = try JsonAppender.init(
+                    self.allocator,
+                    self.name,
+                    self.output,
+                    self.output_mutex,
+                    level,
+                    LogTime.init(self.ns_ts_supplier()),
+                ),
                 .logger = self,
             } });
         },
         .text => {
             return LogEntry.init(.{ .text = .{
-                .text_appender = try TextAppender.init(self.allocator, self.output, self.output_mutex, level, Timestamp.now()),
+                .text_appender = try TextAppender.init(
+                    self.allocator,
+                    self.name,
+                    self.output,
+                    self.output_mutex,
+                    level,
+                    LogTime.init(self.ns_ts_supplier()),
+                ),
                 .logger = self,
             } });
         },
@@ -398,11 +407,11 @@ pub const LogEntry = struct {
         return self;
     }
 
-    inline fn reset(self: *LogEntry) void {
+    inline fn reset(self: *LogEntry, log_time: LogTime) void {
         switch (self.appender) {
             .noop => {},
-            .json => |*jctx| jctx.json_appender.reset(),
-            .text => |*tctx| tctx.text_appender.reset(),
+            .json => |*jctx| jctx.json_appender.reset(log_time),
+            .text => |*tctx| tctx.text_appender.reset(log_time),
         }
     }
 };
@@ -426,6 +435,7 @@ test "logger - smoke test" {
         .format = .json,
         .level = .debug,
         .output = output,
+        .ns_ts_supplier = std.time.nanoTimestamp,
     }, &mtx);
     defer json_logger.deinit();
 
@@ -435,6 +445,7 @@ test "logger - smoke test" {
         .format = .text,
         .level = .debug,
         .output = output,
+        .ns_ts_supplier = std.time.nanoTimestamp,
     }, &mtx);
     defer text_logger.deinit();
 

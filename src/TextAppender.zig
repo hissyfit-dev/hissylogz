@@ -4,6 +4,7 @@
 //! Although this appender is not itself thread-safe, via `Logger`, appenders (like this one) will be managed in a thread-safe pool.
 
 const std = @import("std");
+const builtin = @import("builtin");
 const assert = std.debug.assert;
 const testing = std.testing;
 
@@ -15,13 +16,20 @@ pub const errors = @import("errors.zig");
 pub const AccessError = errors.AccessError;
 pub const AllocationError = errors.AllocationError;
 pub const LogBuffer = @import("LogBuffer.zig");
-pub const Timestamp = constants.Timestamp;
 pub const LogLevel = constants.LogLevel;
+pub const LogTime = @import("LogTime.zig");
 pub const Ulid = @import("ulid.zig").Ulid;
+
+/// Case to use for log level
+pub const LogLevelNameCase = enum {
+    upper,
+    lower,
+};
+pub var log_level_name_case: LogLevelNameCase = .upper;
 
 const Self = @This();
 
-const std_logger = std.log.scoped(.hissylogz_json_appender);
+const std_logger = std.log.scoped(.hissylogz_text_appender);
 
 pub const default_logging_level: LogLevel = .debug;
 
@@ -32,9 +40,12 @@ output: Output,
 output_mutex: *std.Thread.Mutex,
 log_buffer: LogBuffer,
 level: LogLevel,
-timestamp: Timestamp,
+log_time: LogTime,
+tid: std.Thread.Id,
+log_name: []const u8,
 
-pub fn init(allocator: std.mem.Allocator, output: Output, output_mutex: *std.Thread.Mutex, level: LogLevel, timestamp: Timestamp) AllocationError!Self {
+pub fn init(allocator: std.mem.Allocator, log_name: []const u8, output: Output, output_mutex: *std.Thread.Mutex, level: LogLevel, log_time: LogTime) AllocationError!Self {
+    init_names_once.call();
     var new_log_buffer = try LogBuffer.init(allocator);
     errdefer new_log_buffer.deinit();
 
@@ -44,7 +55,9 @@ pub fn init(allocator: std.mem.Allocator, output: Output, output_mutex: *std.Thr
         .output_mutex = output_mutex,
         .log_buffer = new_log_buffer,
         .level = level,
-        .timestamp = timestamp,
+        .log_time = log_time,
+        .log_name = log_name,
+        .tid = std.Thread.getCurrentId(),
     };
 }
 
@@ -52,8 +65,9 @@ pub fn deinit(self: *Self) void {
     self.log_buffer.deinit();
 }
 
-pub fn reset(self: *Self) void {
-    self.timestamp = Timestamp.now();
+pub fn reset(self: *Self, log_time: LogTime) void {
+    self.log_time = log_time;
+    self.tid = std.Thread.getCurrentId();
     self.log_buffer.reset();
 }
 
@@ -79,8 +93,7 @@ pub fn name(self: *Self, opt_value: ?[]const u8) void {
     const value = opt_value orelse {
         return;
     };
-    var w = self.log_buffer.writer();
-    w.print("[{s: <30}] ", .{value}) catch return;
+    self.log_name = value;
 }
 
 pub fn str(self: *Self, key: []const u8, opt_value: ?[]const u8) void {
@@ -319,15 +332,34 @@ fn logTo(self: *Self, writer: anytype) AccessError!void {
     defer self.output_mutex.unlock();
 
     // Write log entry
-    nosuspend writer.print("{rfc3339} {s: >5}: {s}\n", .{
-        self.timestamp,
-        @tagName(self.level),
+    const tid = std.Thread.getCurrentId();
+    nosuspend writer.print("{rfc3339} {s: >5} [{s: <20} ({d})]: {s}\n", .{
+        self.log_time,
+        log_level_names[@intFromEnum(self.level)],
+        self.log_name,
+        tid,
         out_buffer[0 .. out_buffer.len - 1], // skip trailing space (' ')
     }) catch |e| {
         std.debug.print("Access error writing log entry: {any}\n", .{e});
         std_logger.err("Access error writing log entry: {any}\n", .{e});
         return AccessError.AccessFailure;
     };
+}
+
+// This once-per-lifetime function should be invoked using `init_names_once.call()`
+var init_names_once = std.once(initLogLevelNames);
+var log_level_names: [constants.num_log_levels][]const u8 = undefined;
+var llnb: [constants.num_log_levels][7]u8 = undefined;
+fn initLogLevelNames() void {
+    const fn_convert: *const fn (output: []u8, ascii_string: []const u8) []u8 = switch (log_level_name_case) {
+        .upper => std.ascii.upperString,
+        .lower => std.ascii.lowerString,
+    };
+
+    for (0..constants.num_log_levels) |idx| {
+        const tag_name = @tagName(@as(LogLevel, @enumFromInt(idx)));
+        log_level_names[idx] = fn_convert(llnb[idx][0..tag_name.len], tag_name);
+    }
 }
 
 const TextAppender = @This();
@@ -341,26 +373,33 @@ test "text appender - binary" {
         .writer = &werr,
     };
     var mtx: std.Thread.Mutex = .{};
-    var json_appender = try TextAppender.init(allocator, appender_output, &mtx, .debug, constants.Timestamp.now());
-    defer json_appender.deinit();
+    var text_appender = try TextAppender.init(
+        allocator,
+        "text",
+        appender_output,
+        &mtx,
+        .debug,
+        LogTime.now(),
+    );
+    defer text_appender.deinit();
 
     const unencoded = [_]u8{ 'b', 'i', 'n', 'a', 'r', 'y' };
     const encoded = try base64.encode(allocator, &unencoded);
     defer allocator.free(encoded);
-    json_appender.binary("key", &unencoded);
-    try expectLogPostfixFmt(&json_appender, "key=base64(\"{s}\")", .{encoded});
+    text_appender.binary("key", &unencoded);
+    try expectLogPostfixFmt(&text_appender, "key=base64(\"{s}\")", .{encoded});
 
     {
-        json_appender.binary("key", @as(?[]const u8, null));
-        try expectLogPostfix(&json_appender, "key=null");
+        text_appender.binary("key", @as(?[]const u8, null));
+        try expectLogPostfix(&text_appender, "key=null");
     }
 
     const data = [_]u8{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25 };
     for (1..17) |i| {
         const real = try base64.encode(allocator, data[0..i]);
         defer allocator.free(real);
-        json_appender.binary("k", data[0..i]);
-        try expectLogPostfixFmt(&json_appender, "k=base64(\"{s}\")", .{real});
+        text_appender.binary("k", data[0..i]);
+        try expectLogPostfixFmt(&text_appender, "k=base64(\"{s}\")", .{real});
     }
 }
 
@@ -373,23 +412,30 @@ test "text appender - int" {
         .writer = &werr,
     };
     var mtx: std.Thread.Mutex = .{};
-    var json_appender = try TextAppender.init(allocator, appender_output, &mtx, .debug, constants.Timestamp.now());
-    defer json_appender.deinit();
+    var text_appender = try TextAppender.init(
+        allocator,
+        "text",
+        appender_output,
+        &mtx,
+        .debug,
+        LogTime.now(),
+    );
+    defer text_appender.deinit();
 
-    json_appender.int("key", 0);
-    try expectLogPostfix(&json_appender, "key=0");
+    text_appender.int("key", 0);
+    try expectLogPostfix(&text_appender, "key=0");
 
-    json_appender.int("key", -1);
-    try expectLogPostfix(&json_appender, "key=-1");
+    text_appender.int("key", -1);
+    try expectLogPostfix(&text_appender, "key=-1");
 
-    json_appender.int("key", 1066);
-    try expectLogPostfix(&json_appender, "key=1066");
+    text_appender.int("key", 1066);
+    try expectLogPostfix(&text_appender, "key=1066");
 
-    json_appender.int("key", -600);
-    try expectLogPostfix(&json_appender, "key=-600");
+    text_appender.int("key", -600);
+    try expectLogPostfix(&text_appender, "key=-600");
 
-    json_appender.int("n", @as(?u32, null));
-    try expectLogPostfix(&json_appender, "n=null");
+    text_appender.int("n", @as(?u32, null));
+    try expectLogPostfix(&text_appender, "n=null");
 }
 
 test "text appender - boolean" {
@@ -401,17 +447,24 @@ test "text appender - boolean" {
         .writer = &werr,
     };
     var mtx: std.Thread.Mutex = .{};
-    var json_appender = try TextAppender.init(allocator, appender_output, &mtx, .debug, constants.Timestamp.now());
-    defer json_appender.deinit();
+    var text_appender = try TextAppender.init(
+        allocator,
+        "text",
+        appender_output,
+        &mtx,
+        .debug,
+        LogTime.now(),
+    );
+    defer text_appender.deinit();
 
-    json_appender.boolean("cats", true);
-    try expectLogPostfix(&json_appender, "cats=true");
+    text_appender.boolean("cats", true);
+    try expectLogPostfix(&text_appender, "cats=true");
 
-    json_appender.boolean("dogs", false);
-    try expectLogPostfix(&json_appender, "dogs=false");
+    text_appender.boolean("dogs", false);
+    try expectLogPostfix(&text_appender, "dogs=false");
 
-    json_appender.boolean("rats", @as(?bool, null));
-    try expectLogPostfix(&json_appender, "rats=null");
+    text_appender.boolean("rats", @as(?bool, null));
+    try expectLogPostfix(&text_appender, "rats=null");
 }
 
 test "text appender - float" {
@@ -423,23 +476,30 @@ test "text appender - float" {
         .writer = &werr,
     };
     var mtx: std.Thread.Mutex = .{};
-    var json_appender = try TextAppender.init(allocator, appender_output, &mtx, .debug, constants.Timestamp.now());
-    defer json_appender.deinit();
+    var text_appender = try TextAppender.init(
+        allocator,
+        "text",
+        appender_output,
+        &mtx,
+        .debug,
+        LogTime.now(),
+    );
+    defer text_appender.deinit();
 
-    json_appender.float("key", 0);
-    try expectLogPostfix(&json_appender, "key=0");
+    text_appender.float("key", 0);
+    try expectLogPostfix(&text_appender, "key=0");
 
-    json_appender.float("key", -1);
-    try expectLogPostfix(&json_appender, "key=-1");
+    text_appender.float("key", -1);
+    try expectLogPostfix(&text_appender, "key=-1");
 
-    json_appender.float("key", 12345.67891);
-    try expectLogPostfix(&json_appender, "key=12345.67891");
+    text_appender.float("key", 12345.67891);
+    try expectLogPostfix(&text_appender, "key=12345.67891");
 
-    json_appender.float("key", -1.234567891);
-    try expectLogPostfix(&json_appender, "key=-1.234567891");
+    text_appender.float("key", -1.234567891);
+    try expectLogPostfix(&text_appender, "key=-1.234567891");
 
-    json_appender.float("key", @as(?f64, null));
-    try expectLogPostfix(&json_appender, "key=null");
+    text_appender.float("key", @as(?f64, null));
+    try expectLogPostfix(&text_appender, "key=null");
 }
 
 test "text appender - error" {
@@ -451,14 +511,21 @@ test "text appender - error" {
         .writer = &werr,
     };
     var mtx: std.Thread.Mutex = .{};
-    var json_appender = try TextAppender.init(allocator, appender_output, &mtx, .debug, constants.Timestamp.now());
-    defer json_appender.deinit();
+    var text_appender = try TextAppender.init(
+        allocator,
+        "text",
+        appender_output,
+        &mtx,
+        .debug,
+        LogTime.now(),
+    );
+    defer text_appender.deinit();
 
-    json_appender.errK("errK", error.OutOfMemory);
-    try expectLogPostfix(&json_appender, "errK=OutOfMemory");
+    text_appender.errK("errK", error.OutOfMemory);
+    try expectLogPostfix(&text_appender, "errK=OutOfMemory");
 
-    json_appender.err(error.OutOfMemory);
-    try expectLogPostfix(&json_appender, "@err=OutOfMemory");
+    text_appender.err(error.OutOfMemory);
+    try expectLogPostfix(&text_appender, "@err=OutOfMemory");
 }
 
 test "text appender - ctx" {
@@ -470,11 +537,18 @@ test "text appender - ctx" {
         .writer = &werr,
     };
     var mtx: std.Thread.Mutex = .{};
-    var json_appender = try TextAppender.init(allocator, appender_output, &mtx, .debug, constants.Timestamp.now());
-    defer json_appender.deinit();
+    var text_appender = try TextAppender.init(
+        allocator,
+        "text",
+        appender_output,
+        &mtx,
+        .debug,
+        LogTime.now(),
+    );
+    defer text_appender.deinit();
 
-    json_appender.ctx("some context");
-    try expectLogPostfix(&json_appender, "<some context>");
+    text_appender.ctx("some context");
+    try expectLogPostfix(&text_appender, "<some context>");
 }
 
 test "text appender - src" {
@@ -486,47 +560,56 @@ test "text appender - src" {
         .writer = &werr,
     };
     var mtx: std.Thread.Mutex = .{};
-    var json_appender = try TextAppender.init(allocator, appender_output, &mtx, .debug, constants.Timestamp.now());
-    defer json_appender.deinit();
+    var text_appender = try TextAppender.init(
+        allocator,
+        "text",
+        appender_output,
+        &mtx,
+        .debug,
+        LogTime.now(),
+    );
+    defer text_appender.deinit();
 
     const local_src = @src();
-    json_appender.src(local_src);
-    try expectLogPostfixFmt(&json_appender, "@src=\"src/TextAppender.zig:{d}: test.text appender - src\"", .{local_src.line});
+    text_appender.src(local_src);
+    try expectLogPostfixFmt(&text_appender, "@src=\"src/TextAppender.zig:{d}: test.text appender - src\"", .{local_src.line});
 }
 
-fn expectLogPostfix(json_appender: *TextAppender, comptime expected: ?[]const u8) !void {
+fn expectLogPostfix(text_appender: *TextAppender, comptime expected: ?[]const u8) !void {
     var out = std.ArrayList(u8).init(std.testing.allocator);
     try out.ensureTotalCapacity(100);
     defer out.deinit();
 
-    try json_appender.logTo(out.writer());
+    try text_appender.logTo(out.writer());
     if (expected) |e| {
         try std.testing.expectEqualStrings(e, extractPostfix(out.items));
     } else {
         try std.testing.expectEqual(0, out.items.len);
     }
-    json_appender.reset();
+    text_appender.reset(LogTime.now());
 }
 
-fn expectLogPostfixFmt(json_appender: *TextAppender, comptime format: []const u8, args: anytype) !void {
-    defer json_appender.reset();
+fn expectLogPostfixFmt(text_appender: *TextAppender, comptime format: []const u8, args: anytype) !void {
+    defer text_appender.reset(LogTime.now());
 
     var out = std.ArrayList(u8).init(std.testing.allocator);
     try out.ensureTotalCapacity(100);
     defer out.deinit();
 
-    try json_appender.logTo(out.writer());
+    try text_appender.logTo(out.writer());
 
     var buf: [200]u8 = undefined;
     const expected = try std.fmt.bufPrint(&buf, format, args);
     try std.testing.expectEqualStrings(expected, extractPostfix(out.items));
-    json_appender.reset();
+    text_appender.reset(LogTime.now());
 }
 
 fn extractPostfix(text: []const u8) []const u8 {
-    const ts_len = 30;
+    const ts_len = 30 - 3;
     const level_len = @tagName(default_logging_level).len;
-    const prefix_len = ts_len + 1 + level_len + 2;
+    const tid_len = 8;
+    const name_len = 20 + 3;
+    const prefix_len = ts_len + 1 + level_len + 2 + tid_len + name_len + 2 + 1;
     if (text.len <= prefix_len) {
         return text;
     }
