@@ -333,7 +333,7 @@ fn logTo(self: *Self, writer: anytype) AccessError!void {
 
     // Write log entry
     const tid = std.Thread.getCurrentId();
-    nosuspend writer.print("{rfc3339} {s: >5} [{s: <20} ({d})]: {s}\n", .{
+    nosuspend writer.print("{rfc3339} {s: <5} [{s: <35} ({d:0>8})]: {s}\n", .{
         self.log_time,
         log_level_names[@intFromEnum(self.level)],
         self.log_name,
@@ -605,7 +605,7 @@ fn expectLogPostfixFmt(text_appender: *TextAppender, comptime format: []const u8
 }
 
 fn extractPostfix(text: []const u8) []const u8 {
-    const ts_len = 30 - 3;
+    const ts_len = 42;
     const level_len = @tagName(default_logging_level).len;
     const tid_len = 8;
     const name_len = 20 + 3;

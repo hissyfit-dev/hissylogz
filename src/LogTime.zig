@@ -31,6 +31,12 @@ pub inline fn now() Self {
     return init(std.time.nanoTimestamp());
 }
 
-pub fn format(self: Self, comptime _: []const u8, options: std.fmt.FormatOptions, writer: anytype) (@TypeOf(writer).Error || error{Range})!void {
-    try self.utc_ts.format("rfc3339", options, writer);
+pub fn format(self: Self, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) (@TypeOf(writer).Error || error{Range})!void {
+    try writer.print("{rfc3339}T{d:0>2}:{d:0>2}:{d:0>2}.{d:0<6}Z", .{
+        self.utc_ts.date,
+        self.utc_ts.time.hour,
+        self.utc_ts.time.minute,
+        self.utc_ts.time.second,
+        self.utc_ts.time.subsecond,
+    });
 }
