@@ -1,6 +1,6 @@
 .{
     .name = "hissylogz",
-    .version = "0.0.11",
+    .version = "0.0.12",
     .paths = .{ "src", "build.zig", "build.zig.zon", "README.md", "LICENSE.md", "doc" },
     .dependencies = .{
         .datetime = .{

@@ -12,7 +12,7 @@ pub const LogFormat = enum {
 
 /// Logging output
 pub const LogOutput = struct {
-    writer: *std.fs.File.Writer,
+    writer: std.fs.File.Writer,
 };
 
 /// Logging level
@@ -49,7 +49,6 @@ pub const LogOptions = struct {
     output: LogOutput,
     ns_ts_supplier: *const fn () i128,
 };
-
 
 // ---
 // hissylogz.

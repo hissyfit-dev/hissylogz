@@ -425,9 +425,8 @@ test "logger - smoke test" {
     std.debug.print("logger - smoke test\n", .{});
     const allocator = testing.allocator;
 
-    var werr = std.io.getStdErr().writer();
     const output: LogOutput = .{
-        .writer = &werr,
+        .writer = std.io.getStdErr().writer(),
     };
     var mtx: std.Thread.Mutex = .{};
 

@@ -368,9 +368,8 @@ test "text appender - binary" {
     std.debug.print("text appender - binary\n", .{});
     const allocator = testing.allocator;
 
-    var werr = std.io.getStdErr().writer();
     const appender_output: TextAppender.Output = .{
-        .writer = &werr,
+        .writer = std.io.getStdErr().writer(),
     };
     var mtx: std.Thread.Mutex = .{};
     var text_appender = try TextAppender.init(
@@ -407,9 +406,8 @@ test "text appender - int" {
     std.debug.print("text appender - int\n", .{});
     const allocator = testing.allocator;
 
-    var werr = std.io.getStdErr().writer();
     const appender_output: TextAppender.Output = .{
-        .writer = &werr,
+        .writer = std.io.getStdErr().writer(),
     };
     var mtx: std.Thread.Mutex = .{};
     var text_appender = try TextAppender.init(
@@ -442,9 +440,8 @@ test "text appender - boolean" {
     std.debug.print("text appender - boolean\n", .{});
     const allocator = testing.allocator;
 
-    var werr = std.io.getStdErr().writer();
     const appender_output: TextAppender.Output = .{
-        .writer = &werr,
+        .writer = std.io.getStdErr().writer(),
     };
     var mtx: std.Thread.Mutex = .{};
     var text_appender = try TextAppender.init(
@@ -471,9 +468,8 @@ test "text appender - float" {
     std.debug.print("text appender - float\n", .{});
     const allocator = testing.allocator;
 
-    var werr = std.io.getStdErr().writer();
     const appender_output: TextAppender.Output = .{
-        .writer = &werr,
+        .writer = std.io.getStdErr().writer(),
     };
     var mtx: std.Thread.Mutex = .{};
     var text_appender = try TextAppender.init(
@@ -506,9 +502,8 @@ test "text appender - error" {
     std.debug.print("text appender - error\n", .{});
     const allocator = testing.allocator;
 
-    var werr = std.io.getStdErr().writer();
     const appender_output: TextAppender.Output = .{
-        .writer = &werr,
+        .writer = std.io.getStdErr().writer(),
     };
     var mtx: std.Thread.Mutex = .{};
     var text_appender = try TextAppender.init(
@@ -532,9 +527,8 @@ test "text appender - ctx" {
     std.debug.print("text appender - ctx\n", .{});
     const allocator = testing.allocator;
 
-    var werr = std.io.getStdErr().writer();
     const appender_output: TextAppender.Output = .{
-        .writer = &werr,
+        .writer = std.io.getStdErr().writer(),
     };
     var mtx: std.Thread.Mutex = .{};
     var text_appender = try TextAppender.init(
@@ -555,9 +549,8 @@ test "text appender - src" {
     std.debug.print("text appender - src\n", .{});
     const allocator = testing.allocator;
 
-    var werr = std.io.getStdErr().writer();
     const appender_output: TextAppender.Output = .{
-        .writer = &werr,
+        .writer = std.io.getStdErr().writer(),
     };
     var mtx: std.Thread.Mutex = .{};
     var text_appender = try TextAppender.init(

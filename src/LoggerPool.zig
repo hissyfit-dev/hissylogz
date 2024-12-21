@@ -123,9 +123,8 @@ test "logger pool - smoke test" {
     std.debug.print("logger pool - smoke test\n", .{});
     const allocator = testing.allocator;
 
-    var werr = std.io.getStdErr().writer();
     const output: LogOutput = .{
-        .writer = &werr,
+        .writer = std.io.getStdErr().writer(),
     };
     const log_options: LogOptions = .{
         .format = .json,

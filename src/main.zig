@@ -16,7 +16,7 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    try hissylogz.initGlobalLoggerPool(allocator, .{ .writer = @constCast(&std.io.getStdOut().writer()), .filter_level = .info, .log_format = .text });
+    try hissylogz.initGlobalLoggerPool(allocator, .{ .writer = std.io.getStdOut().writer(), .filter_level = .info, .log_format = .text });
     defer hissylogz.deinitGlobalLoggerPool();
 
     var logger = hissylogz.globalLoggerPool().logger("hissylogz");
@@ -31,7 +31,7 @@ pub fn main() !void {
     var thread_logger_pool = try hissylogz.loggerPool(allocator, .{
         .filter_level = .fine,
         .log_format = .text,
-        .writer = @constCast(&std.io.getStdOut().writer()),
+        .writer = std.io.getStdOut().writer(),
     });
     defer thread_logger_pool.deinit();
 

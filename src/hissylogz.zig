@@ -30,7 +30,7 @@ var global_pool: ?LoggerPool = null;
 pub const Options = struct {
     filter_level: LogLevel = .info,
     log_format: LogFormat = .json,
-    writer: *std.fs.File.Writer,
+    writer: std.fs.File.Writer,
     ns_ts_supplier: *const fn () i128 = std.time.nanoTimestamp,
 };
 
@@ -80,7 +80,7 @@ test "hissylogz - loggerPool()" {
 
     std.debug.print("\tlogger pool\n", .{});
     var logger_pool = try loggerPool(allocator, .{
-        .writer = @constCast(&std.io.getStdErr().writer()),
+        .writer = std.io.getStdErr().writer(),
         .filter_level = .info,
     });
 
@@ -98,7 +98,7 @@ test "hissylogz - globalLoggerPool()" {
 
     std.debug.print("\tinit global logger pool\n", .{});
     try initGlobalLoggerPool(allocator, .{
-        .writer = @constCast(&std.io.getStdErr().writer()),
+        .writer = std.io.getStdErr().writer(),
         .filter_level = .debug,
     });
     defer deinitGlobalLoggerPool();
@@ -121,7 +121,7 @@ test "hissylogz - dependencies trigger" {
     _ = &w;
     var mtx: std.Thread.Mutex = .{};
     const output: LogOutput = .{
-        .writer = &w,
+        .writer = w,
     };
     var json_appender = try JsonAppender.init(
         allocator,
