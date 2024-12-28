@@ -37,7 +37,7 @@ output: LogOutput,
 output_mutex: *std.Thread.Mutex,
 format: LogFormat,
 level: LogLevel,
-ns_ts_supplier: *const fn () i128,
+supplyTimestamp: *const fn () i128,
 level_filter_ordinal: u3,
 
 pub fn init(name: []const u8, allocator: std.mem.Allocator, options: LogOptions, output_mutex: *std.Thread.Mutex) AllocationError!Self {
@@ -66,7 +66,7 @@ pub fn init(name: []const u8, allocator: std.mem.Allocator, options: LogOptions,
         .level = options.level,
         .output_mutex = output_mutex,
         .format = options.format,
-        .ns_ts_supplier = options.ns_ts_supplier,
+        .supplyTimestamp = options.ns_ts_supplier,
         .level_filter_ordinal = level_filter_ordinal,
     };
 }
@@ -133,7 +133,7 @@ fn acquireEntry(self: *Self, level: LogLevel) AllocationError!*LogEntry {
         return new_entry;
     };
 
-    entry.reset(LogTime.init(self.ns_ts_supplier()));
+    entry.reset(LogTime.init(self.supplyTimestamp()));
     return entry;
 }
 
@@ -158,7 +158,7 @@ fn createLogEntry(self: *Self, level: LogLevel) AllocationError!LogEntry {
                     self.output,
                     self.output_mutex,
                     level,
-                    LogTime.init(self.ns_ts_supplier()),
+                    LogTime.init(self.supplyTimestamp()),
                 ),
                 .logger = self,
             } });
@@ -171,7 +171,7 @@ fn createLogEntry(self: *Self, level: LogLevel) AllocationError!LogEntry {
                     self.output,
                     self.output_mutex,
                     level,
-                    LogTime.init(self.ns_ts_supplier()),
+                    LogTime.init(self.supplyTimestamp()),
                 ),
                 .logger = self,
             } });
