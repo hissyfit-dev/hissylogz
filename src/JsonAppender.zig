@@ -237,6 +237,26 @@ pub fn obj(self: *Self, key: []const u8, value: anytype) void {
     w.writeByte(',') catch return;
 }
 
+pub fn any(self: *Self, key: []const u8, value: anytype) void {
+    const any_val = switch (@typeInfo(@TypeOf(value))) {
+        .Optional => blk: {
+            if (value) |v| {
+                break :blk v;
+            }
+            self.writeNull(key);
+            return;
+        },
+        .Null => {
+            self.writeNull(key);
+            return;
+        },
+        else => value,
+    };
+
+    var w = self.log_buffer.writer();
+    w.print("\"{s}\":\"{any}\",", .{ key, any_val }) catch return;
+}
+
 pub fn binary(self: *Self, key: []const u8, opt_value: ?[]const u8) void {
     const value = opt_value orelse {
         self.writeNull(key);
@@ -653,6 +673,30 @@ test "json appender - obj" {
 
     json_appender.obj("rats", rats);
     try expectLogPostfixFmt(&json_appender, "\"rats\":{{\"some\":\"some\",\"thing\":\"thing\"}}}}", .{});
+}
+
+test "json appender - any" {
+    std.debug.print("json appender - any\n", .{});
+    const allocator = testing.allocator;
+
+    const appender_output: JsonAppender.Output = .{
+        .writer = std.io.getStdErr().writer(),
+    };
+    var mtx: std.Thread.Mutex = .{};
+    var json_appender = try JsonAppender.init(
+        allocator,
+        "json",
+        appender_output,
+        &mtx,
+        .debug,
+        LogTime.now(),
+    );
+    defer json_appender.deinit();
+
+    const rats = .{ .some = "some", .thing = "thing" };
+
+    json_appender.any("rats", rats);
+    try expectLogPostfixFmt(&json_appender, "\"rats\":\"struct{{comptime some: *const [4:0]u8 = \"some\", comptime thing: *const [5:0]u8 = \"thing\"}}{{ .some = {{ 115, 111, 109, 101 }}, .thing = {{ 116, 104, 105, 110, 103 }} }}\"}}", .{});
 }
 
 fn expectLogPostfix(json_appender: *JsonAppender, comptime expected: ?[]const u8) !void {

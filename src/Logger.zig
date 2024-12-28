@@ -353,6 +353,15 @@ pub const LogEntry = struct {
         return self;
     }
 
+    pub inline fn any(self: *LogEntry, key: []const u8, value: anytype) *LogEntry {
+        switch (self.appender) {
+            .noop => {},
+            .json => |*jctx| jctx.json_appender.any(key, value),
+            .text => |*tctx| tctx.text_appender.any(key, value),
+        }
+        return self;
+    }
+
     pub inline fn binary(self: *LogEntry, key: []const u8, opt_value: ?[]const u8) *LogEntry {
         switch (self.appender) {
             .noop => {},
@@ -394,15 +403,6 @@ pub const LogEntry = struct {
             .noop => {},
             .json => |*jctx| jctx.json_appender.span(opt_value),
             .text => |*tctx| tctx.text_appender.span(opt_value),
-        }
-        return self;
-    }
-
-    pub inline fn fmt(self: *LogEntry, key: []const u8, comptime format: []const u8, values: anytype) *LogEntry {
-        switch (self.appender) {
-            .noop => {},
-            .json => |*jctx| jctx.json_appender.fmt(key, format, values),
-            .text => |*tctx| tctx.text_appender.fmt(key, format, values),
         }
         return self;
     }
