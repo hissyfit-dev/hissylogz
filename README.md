@@ -24,7 +24,7 @@ These are early days, and the feature set may grow, bugs will be found and fixed
 Let zig fetch the package and integrate it into your `build.zig.zon` automagically:
 
 ```shell
-zig fetch --save https://github.com/hissyfit-dev/hissylogz/archive/refs/tags/v0.0.11.tar.gz
+zig fetch --save https://github.com/hissyfit-dev/hissylogz/archive/refs/tags/v0.0.12.tar.gz
 ```
 
 ### Integrate into your build
@@ -91,7 +91,7 @@ pub fn main() !void {
 
     // Prepare logger pool
     const pool = try hissylogz.loggerPool(allocator, .{
-        .writer = @constCast(&std.io.getStdErr().writer()),
+        .writer = std.io.getStdErr().writer(),
         .filter_level = .info,
     });
     defer pool.deinit();
@@ -219,7 +219,7 @@ pub fn main() !void {
 
     // Prepare global logger pool
     try hissylogz.initGlobalLoggerPool(allocator, .{
-        .writer = @constCast(&std.io.getStdErr().writer()),
+        .writer = std.io.getStdErr().writer(),
         .filter_level = .info,
     });
     defer hissylogz.deinitGlobalLoggerPool();

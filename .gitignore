@@ -4,6 +4,10 @@ zig-cache/
 .zig-cache/
 zig-out/
 
+### LLVM ###
+
+*.dSYM
+
 ### Java ###
 
 *.class

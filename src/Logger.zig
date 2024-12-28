@@ -37,7 +37,7 @@ output: LogOutput,
 output_mutex: *std.Thread.Mutex,
 format: LogFormat,
 level: LogLevel,
-ns_ts_supplier: *const fn () i128,
+supplyTimestamp: *const fn () i128,
 level_filter_ordinal: u3,
 
 pub fn init(name: []const u8, allocator: std.mem.Allocator, options: LogOptions, output_mutex: *std.Thread.Mutex) AllocationError!Self {
@@ -66,7 +66,7 @@ pub fn init(name: []const u8, allocator: std.mem.Allocator, options: LogOptions,
         .level = options.level,
         .output_mutex = output_mutex,
         .format = options.format,
-        .ns_ts_supplier = options.ns_ts_supplier,
+        .supplyTimestamp = options.ns_ts_supplier,
         .level_filter_ordinal = level_filter_ordinal,
     };
 }
@@ -133,7 +133,7 @@ fn acquireEntry(self: *Self, level: LogLevel) AllocationError!*LogEntry {
         return new_entry;
     };
 
-    entry.reset(LogTime.init(self.ns_ts_supplier()));
+    entry.reset(LogTime.init(self.supplyTimestamp()));
     return entry;
 }
 
@@ -158,7 +158,7 @@ fn createLogEntry(self: *Self, level: LogLevel) AllocationError!LogEntry {
                     self.output,
                     self.output_mutex,
                     level,
-                    LogTime.init(self.ns_ts_supplier()),
+                    LogTime.init(self.supplyTimestamp()),
                 ),
                 .logger = self,
             } });
@@ -171,7 +171,7 @@ fn createLogEntry(self: *Self, level: LogLevel) AllocationError!LogEntry {
                     self.output,
                     self.output_mutex,
                     level,
-                    LogTime.init(self.ns_ts_supplier()),
+                    LogTime.init(self.supplyTimestamp()),
                 ),
                 .logger = self,
             } });
@@ -353,6 +353,15 @@ pub const LogEntry = struct {
         return self;
     }
 
+    pub inline fn any(self: *LogEntry, key: []const u8, value: anytype) *LogEntry {
+        switch (self.appender) {
+            .noop => {},
+            .json => |*jctx| jctx.json_appender.any(key, value),
+            .text => |*tctx| tctx.text_appender.any(key, value),
+        }
+        return self;
+    }
+
     pub inline fn binary(self: *LogEntry, key: []const u8, opt_value: ?[]const u8) *LogEntry {
         switch (self.appender) {
             .noop => {},
@@ -398,15 +407,6 @@ pub const LogEntry = struct {
         return self;
     }
 
-    pub inline fn fmt(self: *LogEntry, key: []const u8, comptime format: []const u8, values: anytype) *LogEntry {
-        switch (self.appender) {
-            .noop => {},
-            .json => |*jctx| jctx.json_appender.fmt(key, format, values),
-            .text => |*tctx| tctx.text_appender.fmt(key, format, values),
-        }
-        return self;
-    }
-
     inline fn reset(self: *LogEntry, log_time: LogTime) void {
         switch (self.appender) {
             .noop => {},
@@ -425,9 +425,8 @@ test "logger - smoke test" {
     std.debug.print("logger - smoke test\n", .{});
     const allocator = testing.allocator;
 
-    var werr = std.io.getStdErr().writer();
     const output: LogOutput = .{
-        .writer = &werr,
+        .writer = std.io.getStdErr().writer(),
     };
     var mtx: std.Thread.Mutex = .{};
 

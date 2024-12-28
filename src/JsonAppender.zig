@@ -237,6 +237,26 @@ pub fn obj(self: *Self, key: []const u8, value: anytype) void {
     w.writeByte(',') catch return;
 }
 
+pub fn any(self: *Self, key: []const u8, value: anytype) void {
+    const any_val = switch (@typeInfo(@TypeOf(value))) {
+        .Optional => blk: {
+            if (value) |v| {
+                break :blk v;
+            }
+            self.writeNull(key);
+            return;
+        },
+        .Null => {
+            self.writeNull(key);
+            return;
+        },
+        else => value,
+    };
+
+    var w = self.log_buffer.writer();
+    w.print("\"{s}\":\"{any}\",", .{ key, any_val }) catch return;
+}
+
 pub fn binary(self: *Self, key: []const u8, opt_value: ?[]const u8) void {
     const value = opt_value orelse {
         self.writeNull(key);
@@ -339,9 +359,8 @@ test "json appender - smoke test" {
     std.debug.print("json appender - smoke test\n", .{});
     const allocator = testing.allocator;
 
-    var werr = std.io.getStdErr().writer();
     const appender_output: JsonAppender.Output = .{
-        .writer = &werr,
+        .writer = std.io.getStdErr().writer(),
     };
     var mtx: std.Thread.Mutex = .{};
 
@@ -388,7 +407,7 @@ test "json appender - smoke test" {
     embedded[embedded.len - 1] = '}';
     json_appender.str("embedded_key", embedded);
 
-    try werr.writeByte('\t');
+    try std.io.getStdErr().writer().writeByte('\t');
     json_appender.log();
 }
 
@@ -396,9 +415,8 @@ test "json appender - binary" {
     std.debug.print("json appender - binary\n", .{});
     const allocator = testing.allocator;
 
-    var werr = std.io.getStdErr().writer();
     const appender_output: JsonAppender.Output = .{
-        .writer = &werr,
+        .writer = std.io.getStdErr().writer(),
     };
     var mtx: std.Thread.Mutex = .{};
 
@@ -436,9 +454,8 @@ test "json appender - int" {
     std.debug.print("json appender - int\n", .{});
     const allocator = testing.allocator;
 
-    var werr = std.io.getStdErr().writer();
     const appender_output: JsonAppender.Output = .{
-        .writer = &werr,
+        .writer = std.io.getStdErr().writer(),
     };
     var mtx: std.Thread.Mutex = .{};
 
@@ -472,9 +489,8 @@ test "json appender - intx" {
     std.debug.print("json appender - intx\n", .{});
     const allocator = testing.allocator;
 
-    var werr = std.io.getStdErr().writer();
     const appender_output: JsonAppender.Output = .{
-        .writer = &werr,
+        .writer = std.io.getStdErr().writer(),
     };
     var mtx: std.Thread.Mutex = .{};
 
@@ -502,9 +518,8 @@ test "json appender - boolean" {
     std.debug.print("json appender - boolean\n", .{});
     const allocator = testing.allocator;
 
-    var werr = std.io.getStdErr().writer();
     const appender_output: JsonAppender.Output = .{
-        .writer = &werr,
+        .writer = std.io.getStdErr().writer(),
     };
     var mtx: std.Thread.Mutex = .{};
 
@@ -532,9 +547,8 @@ test "json appender - float" {
     std.debug.print("json appender - float\n", .{});
     const allocator = testing.allocator;
 
-    var werr = std.io.getStdErr().writer();
     const appender_output: JsonAppender.Output = .{
-        .writer = &werr,
+        .writer = std.io.getStdErr().writer(),
     };
     var mtx: std.Thread.Mutex = .{};
 
@@ -568,9 +582,8 @@ test "json appender - error" {
     std.debug.print("json appender - error\n", .{});
     const allocator = testing.allocator;
 
-    var werr = std.io.getStdErr().writer();
     const appender_output: JsonAppender.Output = .{
-        .writer = &werr,
+        .writer = std.io.getStdErr().writer(),
     };
     var mtx: std.Thread.Mutex = .{};
 
@@ -595,9 +608,8 @@ test "json appender - ctx" {
     std.debug.print("json appender - ctx\n", .{});
     const allocator = testing.allocator;
 
-    var werr = std.io.getStdErr().writer();
     const appender_output: JsonAppender.Output = .{
-        .writer = &werr,
+        .writer = std.io.getStdErr().writer(),
     };
     var mtx: std.Thread.Mutex = .{};
 
@@ -619,9 +631,8 @@ test "json appender - src" {
     std.debug.print("json appender - src\n", .{});
     const allocator = testing.allocator;
 
-    var werr = std.io.getStdErr().writer();
     const appender_output: JsonAppender.Output = .{
-        .writer = &werr,
+        .writer = std.io.getStdErr().writer(),
     };
     var mtx: std.Thread.Mutex = .{};
 
@@ -644,9 +655,8 @@ test "json appender - obj" {
     std.debug.print("json appender - obj\n", .{});
     const allocator = testing.allocator;
 
-    var werr = std.io.getStdErr().writer();
     const appender_output: JsonAppender.Output = .{
-        .writer = &werr,
+        .writer = std.io.getStdErr().writer(),
     };
     var mtx: std.Thread.Mutex = .{};
     var json_appender = try JsonAppender.init(
@@ -663,6 +673,30 @@ test "json appender - obj" {
 
     json_appender.obj("rats", rats);
     try expectLogPostfixFmt(&json_appender, "\"rats\":{{\"some\":\"some\",\"thing\":\"thing\"}}}}", .{});
+}
+
+test "json appender - any" {
+    std.debug.print("json appender - any\n", .{});
+    const allocator = testing.allocator;
+
+    const appender_output: JsonAppender.Output = .{
+        .writer = std.io.getStdErr().writer(),
+    };
+    var mtx: std.Thread.Mutex = .{};
+    var json_appender = try JsonAppender.init(
+        allocator,
+        "json",
+        appender_output,
+        &mtx,
+        .debug,
+        LogTime.now(),
+    );
+    defer json_appender.deinit();
+
+    const rats = .{ .some = "some", .thing = "thing" };
+
+    json_appender.any("rats", rats);
+    try expectLogPostfixFmt(&json_appender, "\"rats\":\"struct{{comptime some: *const [4:0]u8 = \"some\", comptime thing: *const [5:0]u8 = \"thing\"}}{{ .some = {{ 115, 111, 109, 101 }}, .thing = {{ 116, 104, 105, 110, 103 }} }}\"}}", .{});
 }
 
 fn expectLogPostfix(json_appender: *JsonAppender, comptime expected: ?[]const u8) !void {

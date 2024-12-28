@@ -248,6 +248,26 @@ pub fn obj(self: *Self, key: []const u8, value: anytype) void {
     w.writeByte(' ') catch return;
 }
 
+pub fn any(self: *Self, key: []const u8, value: anytype) void {
+    const any_val = switch (@typeInfo(@TypeOf(value))) {
+        .Optional => blk: {
+            if (value) |v| {
+                break :blk v;
+            }
+            self.writeNull(key);
+            return;
+        },
+        .Null => {
+            self.writeNull(key);
+            return;
+        },
+        else => value,
+    };
+
+    var w = self.log_buffer.writer();
+    w.print("{s}={any} ", .{ key, any_val }) catch return;
+}
+
 pub fn binary(self: *Self, key: []const u8, opt_value: ?[]const u8) void {
     const value = opt_value orelse {
         self.writeNull(key);
@@ -368,9 +388,8 @@ test "text appender - binary" {
     std.debug.print("text appender - binary\n", .{});
     const allocator = testing.allocator;
 
-    var werr = std.io.getStdErr().writer();
     const appender_output: TextAppender.Output = .{
-        .writer = &werr,
+        .writer = std.io.getStdErr().writer(),
     };
     var mtx: std.Thread.Mutex = .{};
     var text_appender = try TextAppender.init(
@@ -407,9 +426,8 @@ test "text appender - int" {
     std.debug.print("text appender - int\n", .{});
     const allocator = testing.allocator;
 
-    var werr = std.io.getStdErr().writer();
     const appender_output: TextAppender.Output = .{
-        .writer = &werr,
+        .writer = std.io.getStdErr().writer(),
     };
     var mtx: std.Thread.Mutex = .{};
     var text_appender = try TextAppender.init(
@@ -442,9 +460,8 @@ test "text appender - boolean" {
     std.debug.print("text appender - boolean\n", .{});
     const allocator = testing.allocator;
 
-    var werr = std.io.getStdErr().writer();
     const appender_output: TextAppender.Output = .{
-        .writer = &werr,
+        .writer = std.io.getStdErr().writer(),
     };
     var mtx: std.Thread.Mutex = .{};
     var text_appender = try TextAppender.init(
@@ -471,9 +488,8 @@ test "text appender - float" {
     std.debug.print("text appender - float\n", .{});
     const allocator = testing.allocator;
 
-    var werr = std.io.getStdErr().writer();
     const appender_output: TextAppender.Output = .{
-        .writer = &werr,
+        .writer = std.io.getStdErr().writer(),
     };
     var mtx: std.Thread.Mutex = .{};
     var text_appender = try TextAppender.init(
@@ -506,9 +522,8 @@ test "text appender - error" {
     std.debug.print("text appender - error\n", .{});
     const allocator = testing.allocator;
 
-    var werr = std.io.getStdErr().writer();
     const appender_output: TextAppender.Output = .{
-        .writer = &werr,
+        .writer = std.io.getStdErr().writer(),
     };
     var mtx: std.Thread.Mutex = .{};
     var text_appender = try TextAppender.init(
@@ -532,9 +547,8 @@ test "text appender - ctx" {
     std.debug.print("text appender - ctx\n", .{});
     const allocator = testing.allocator;
 
-    var werr = std.io.getStdErr().writer();
     const appender_output: TextAppender.Output = .{
-        .writer = &werr,
+        .writer = std.io.getStdErr().writer(),
     };
     var mtx: std.Thread.Mutex = .{};
     var text_appender = try TextAppender.init(
@@ -555,9 +569,8 @@ test "text appender - src" {
     std.debug.print("text appender - src\n", .{});
     const allocator = testing.allocator;
 
-    var werr = std.io.getStdErr().writer();
     const appender_output: TextAppender.Output = .{
-        .writer = &werr,
+        .writer = std.io.getStdErr().writer(),
     };
     var mtx: std.Thread.Mutex = .{};
     var text_appender = try TextAppender.init(
@@ -573,6 +586,30 @@ test "text appender - src" {
     const local_src = @src();
     text_appender.src(local_src);
     try expectLogPostfixFmt(&text_appender, "@src=\"src/TextAppender.zig:{d}: test.text appender - src\"", .{local_src.line});
+}
+
+test "text appender - any" {
+    std.debug.print("text appender - any\n", .{});
+    const allocator = testing.allocator;
+
+    const appender_output: TextAppender.Output = .{
+        .writer = std.io.getStdErr().writer(),
+    };
+    var mtx: std.Thread.Mutex = .{};
+    var json_appender = try TextAppender.init(
+        allocator,
+        "text",
+        appender_output,
+        &mtx,
+        .debug,
+        LogTime.now(),
+    );
+    defer json_appender.deinit();
+
+    const rats = .{ .some = "some", .thing = "thing" };
+
+    json_appender.any("rats", rats);
+    try expectLogPostfixFmt(&json_appender, "rats=struct{{comptime some: *const [4:0]u8 = \"some\", comptime thing: *const [5:0]u8 = \"thing\"}}{{ .some = {{ 115, 111, 109, 101 }}, .thing = {{ 116, 104, 105, 110, 103 }} }}", .{});
 }
 
 fn expectLogPostfix(text_appender: *TextAppender, comptime expected: ?[]const u8) !void {
