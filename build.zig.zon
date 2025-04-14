@@ -1,6 +1,12 @@
 .{
     .name = .hissylogz,
     .fingerprint = 0xc2f51a01cf4cfb32,
-    .version = "0.1.0",
+    .version = "0.1.1",
+    .dependencies = .{
+        .datetime = .{
+            .url = "https://github.com/hissyfit-dev/datetime/archive/refs/tags/0.0.4-hissyfit.tar.gz",
+            .hash = "datetime-0.0.4-hissyfit-ZLB6IFaxAAAwvEWPVw1rCzhrCbuCZCx92KyDTYoQlDzK",
+        },
+    },
     .paths = .{ "src", "build.zig", "build.zig.zon", "README.md", "LICENSE.md", "doc" },
 }
