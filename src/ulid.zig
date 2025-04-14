@@ -134,7 +134,7 @@ pub const GeneratorError = error{
 };
 
 pub const Generator = struct {
-    r: std.rand.Random = std.crypto.random,
+    r: std.Random = std.crypto.random,
     last: Ulid = .{ .time = 0, .rand = 0 },
 
     pub fn next(self: *@This()) GeneratorError!Ulid {

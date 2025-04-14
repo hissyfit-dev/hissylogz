@@ -126,14 +126,14 @@ pub fn ulid(self: *Self, key: []const u8, opt_value: ?Ulid) void {
 
 pub fn int(self: *Self, key: []const u8, value: anytype) void {
     const int_val = switch (@typeInfo(@TypeOf(value))) {
-        .Optional => blk: {
+        .optional => blk: {
             if (value) |v| {
                 break :blk v;
             }
             self.writeNull(key);
             return;
         },
-        .Null => {
+        .null => {
             self.writeNull(key);
             return;
         },
@@ -146,14 +146,14 @@ pub fn int(self: *Self, key: []const u8, value: anytype) void {
 
 pub fn intx(self: *Self, key: []const u8, value: anytype) void {
     const int_val = switch (@typeInfo(@TypeOf(value))) {
-        .Optional => blk: {
+        .optional => blk: {
             if (value) |v| {
                 break :blk v;
             }
             self.writeNull(key);
             return;
         },
-        .Null => {
+        .null => {
             self.writeNull(key);
             return;
         },
@@ -166,14 +166,14 @@ pub fn intx(self: *Self, key: []const u8, value: anytype) void {
 
 pub fn intb(self: *Self, key: []const u8, value: anytype) void {
     const int_val = switch (@typeInfo(@TypeOf(value))) {
-        .Optional => blk: {
+        .optional => blk: {
             if (value) |v| {
                 break :blk v;
             }
             self.writeNull(key);
             return;
         },
-        .Null => {
+        .null => {
             self.writeNull(key);
             return;
         },
@@ -186,14 +186,14 @@ pub fn intb(self: *Self, key: []const u8, value: anytype) void {
 
 pub fn float(self: *Self, key: []const u8, value: anytype) void {
     const float_val = switch (@typeInfo(@TypeOf(value))) {
-        .Optional => blk: {
+        .optional => blk: {
             if (value) |v| {
                 break :blk v;
             }
             self.writeNull(key);
             return;
         },
-        .Null => {
+        .null => {
             self.writeNull(key);
             return;
         },
@@ -206,14 +206,14 @@ pub fn float(self: *Self, key: []const u8, value: anytype) void {
 
 pub fn boolean(self: *Self, key: []const u8, value: anytype) void {
     const bool_val = switch (@typeInfo(@TypeOf(value))) {
-        .Optional => blk: {
+        .optional => blk: {
             if (value) |v| {
                 break :blk v;
             }
             self.writeNull(key);
             return;
         },
-        .Null => {
+        .null => {
             self.writeNull(key);
             return;
         },
@@ -226,14 +226,14 @@ pub fn boolean(self: *Self, key: []const u8, value: anytype) void {
 
 pub fn obj(self: *Self, key: []const u8, value: anytype) void {
     const obj_val = switch (@typeInfo(@TypeOf(value))) {
-        .Optional => blk: {
+        .optional => blk: {
             if (value) |v| {
                 break :blk v;
             }
             self.writeNull(key);
             return;
         },
-        .Null => {
+        .null => {
             self.writeNull(key);
             return;
         },
@@ -250,14 +250,14 @@ pub fn obj(self: *Self, key: []const u8, value: anytype) void {
 
 pub fn any(self: *Self, key: []const u8, value: anytype) void {
     const any_val = switch (@typeInfo(@TypeOf(value))) {
-        .Optional => blk: {
+        .optional => blk: {
             if (value) |v| {
                 break :blk v;
             }
             self.writeNull(key);
             return;
         },
-        .Null => {
+        .null => {
             self.writeNull(key);
             return;
         },
@@ -289,7 +289,7 @@ pub fn errK(self: *Self, key: []const u8, value: anyerror) void {
     const T = @TypeOf(value);
 
     switch (@typeInfo(T)) {
-        .Optional => {
+        .optional => {
             if (value) |v| {
                 self.rawStr(key, @errorName(v));
             } else {
