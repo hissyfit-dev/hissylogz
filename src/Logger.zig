@@ -120,7 +120,7 @@ fn acquireEntry(self: *Self, level: LogLevel) AllocationError!*LogEntry {
     defer self.entry_pools_mutex.unlock();
 
     var pool = &self.entry_pools[@intFromEnum(level)];
-    var entry = pool.popOrNull() orelse {
+    var entry = pool.pop() orelse {
         const new_entry = self.allocator.create(LogEntry) catch |e| {
             std_logger.err("Failed to acquire log entry: {any}", .{e});
             std_logger.debug("Falling back to no-op log entry.", .{});

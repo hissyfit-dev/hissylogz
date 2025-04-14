@@ -40,7 +40,7 @@ pub const LogLevel = enum(u3) {
         return null;
     }
 };
-pub const num_log_levels = @typeInfo(LogLevel).Enum.fields.len - 1; // .none doesn't count
+pub const num_log_levels = @typeInfo(LogLevel).@"enum".fields.len - 1; // .none doesn't count
 
 /// Logging options
 pub const LogOptions = struct {
