@@ -68,22 +68,24 @@ pub fn deinit(self: *Self) void {
 }
 
 pub fn logger(self: *Self, name: []const u8) *Logger {
-    self.rw_lock.lockShared();
-    errdefer self.rw_lock.unlockShared();
-
-    if (self.fetchExisting(name)) |existing_logger| {
+    {
+        self.rw_lock.lockShared();
         defer self.rw_lock.unlockShared();
-        return existing_logger;
+
+        if (self.fetchExisting(name)) |existing_logger| {
+            return existing_logger;
+        }
     }
-    self.rw_lock.unlockShared();
 
-    self.rw_lock.lock();
-    defer self.rw_lock.unlock();
+    {
+        self.rw_lock.lock();
+        defer self.rw_lock.unlock();
 
-    return self.fetchOrAdd(name) catch |e| {
-        std_logger.warn("Using fallback logger due to error: {any}", .{e});
-        return &self.noop_logger;
-    };
+        return self.fetchOrAdd(name) catch |e| {
+            std_logger.warn("Using fallback logger due to error: {any}", .{e});
+            return &self.noop_logger;
+        };
+    }
 }
 
 fn fetchOrAdd(self: *Self, name: []const u8) AllocationError!*Logger {
@@ -123,8 +125,11 @@ test "logger pool - smoke test" {
     std.debug.print("logger pool - smoke test\n", .{});
     const allocator = testing.allocator;
 
+    var stderr_buffer: [1024]u8 = undefined;
+    var stderr_writer = std.fs.File.stderr().writer(&stderr_buffer);
+    const stderr = &stderr_writer.interface;
     const output: LogOutput = .{
-        .writer = std.io.getStdErr().writer(),
+        .writer = stderr,
     };
     const log_options: LogOptions = .{
         .format = .json,
@@ -161,7 +166,7 @@ test "logger pool - smoke test" {
 // ---
 // hissylogz.
 //
-// Copyright 2024 Kevin Poalses.
+// Copyright 2024,2025 Kevin Poalses.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 // The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.

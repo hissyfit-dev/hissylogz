@@ -1,6 +1,6 @@
 # hissylogz
 
-Structured logging support for Zig 0.14.0, enjoy, or my cat may hiss at you.
+Structured logging support for Zig 0.15.1, enjoy, or my cat may hiss at you.
 
 I created a miniature logging framework to satisfy my immediate needs:
 - Simple, low ceremony logging
@@ -24,7 +24,7 @@ These are early days, and the feature set may grow, bugs will be found and fixed
 Let zig fetch the package and integrate it into your `build.zig.zon` automagically:
 
 ```shell
-zig fetch --save https://github.com/hissyfit-dev/hissylogz/archive/refs/tags/v0.1.1.tar.gz
+zig fetch --save https://github.com/hissyfit-dev/hissylogz/archive/refs/tags/v0.1.2.tar.gz
 ```
 
 ### Integrate into your build
@@ -89,9 +89,13 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
+    // Prepare STDOUT
+    var stdout_buffer: [1024]u8 = undefined;
+    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+
     // Prepare logger pool
     const pool = try hissylogz.loggerPool(allocator, .{
-        .writer = std.io.getStdErr().writer(),
+        .writer = &stdout_writer,
         .filter_level = .info,
     });
     defer pool.deinit();
@@ -217,9 +221,13 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
+    // Prepare STDOUT
+    var stdout_buffer: [1024]u8 = undefined;
+    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+
     // Prepare global logger pool
     try hissylogz.initGlobalLoggerPool(allocator, .{
-        .writer = std.io.getStdErr().writer(),
+        .writer = &stdout_writer,
         .filter_level = .info,
     });
     defer hissylogz.deinitGlobalLoggerPool();
@@ -265,11 +273,7 @@ pub fn main() !void {
 
 ## Dependencies
 
-### `datetime`
-
-This module uses [`datetime`](https://github.com/hissyfit-dev/datetime) for timestamps and RFC3339 rendering.
-
-`datetime` itself has no further dependencies.
+NONE!
 
 ## Acknowledgements
 

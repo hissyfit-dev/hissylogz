@@ -16,7 +16,14 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    try hissylogz.initGlobalLoggerPool(allocator, .{ .writer = std.io.getStdOut().writer(), .filter_level = .info, .log_format = .text });
+    var stdout_buffer: [1024]u8 = undefined;
+    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+
+    try hissylogz.initGlobalLoggerPool(allocator, .{
+        .writer = &stdout_writer.interface,
+        .filter_level = .info,
+        .log_format = .text,
+    });
     defer hissylogz.deinitGlobalLoggerPool();
 
     var logger = hissylogz.globalLoggerPool().logger("hissylogz");
@@ -31,7 +38,7 @@ pub fn main() !void {
     var thread_logger_pool = try hissylogz.loggerPool(allocator, .{
         .filter_level = .fine,
         .log_format = .text,
-        .writer = std.io.getStdOut().writer(),
+        .writer = &stdout_writer.interface,
     });
     defer thread_logger_pool.deinit();
 
@@ -83,9 +90,9 @@ fn threadLogger(logger_pool: *hissylogz.LoggerPool, allocator: std.mem.Allocator
 }
 
 fn timeNoopLogging(pool: *LoggerPool) !u64 {
+    var logger = pool.logger("no-op");
     var t = try std.time.Timer.start();
     const started = t.read();
-    var logger = pool.logger("no-op");
     for (0..10_000) |idx| {
         logger.debug().int("idx", idx).log();
     }
@@ -95,7 +102,7 @@ fn timeNoopLogging(pool: *LoggerPool) !u64 {
 // ---
 // hissylogz.
 //
-// Copyright 2024 Kevin Poalses.
+// Copyright 2024,2025 Kevin Poalses.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 // The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.

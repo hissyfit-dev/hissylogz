@@ -30,7 +30,7 @@ var global_pool: ?LoggerPool = null;
 pub const Options = struct {
     filter_level: LogLevel = .info,
     log_format: LogFormat = .json,
-    writer: std.fs.File.Writer,
+    writer: *std.Io.Writer,
     ns_ts_supplier: *const fn () i128 = std.time.nanoTimestamp,
 };
 
@@ -79,8 +79,12 @@ test "hissylogz - loggerPool()" {
     const allocator = testing.allocator;
 
     std.debug.print("\tlogger pool\n", .{});
+
+    var stderr_buffer: [1024]u8 = undefined;
+    var stderr_writer = std.fs.File.stderr().writer(&stderr_buffer);
+    const stderr = &stderr_writer.interface;
     var logger_pool = try loggerPool(allocator, .{
-        .writer = std.io.getStdErr().writer(),
+        .writer = stderr,
         .filter_level = .info,
     });
 
@@ -97,8 +101,12 @@ test "hissylogz - globalLoggerPool()" {
     const allocator = testing.allocator;
 
     std.debug.print("\tinit global logger pool\n", .{});
+
+    var stderr_buffer: [1024]u8 = undefined;
+    var stderr_writer = std.fs.File.stderr().writer(&stderr_buffer);
+    const stderr = &stderr_writer.interface;
     try initGlobalLoggerPool(allocator, .{
-        .writer = std.io.getStdErr().writer(),
+        .writer = stderr,
         .filter_level = .debug,
     });
     defer deinitGlobalLoggerPool();
@@ -117,11 +125,12 @@ test "hissylogz - dependencies trigger" {
 
     std.debug.print("\tjson appender\n", .{});
 
-    var w = std.io.getStdErr().writer();
-    _ = &w;
+    var stderr_buffer: [1024]u8 = undefined;
+    var stderr_writer = std.fs.File.stderr().writer(&stderr_buffer);
+    const stderr = &stderr_writer.interface;
     var mtx: std.Thread.Mutex = .{};
     const output: LogOutput = .{
-        .writer = w,
+        .writer = stderr,
     };
     var json_appender = try JsonAppender.init(
         allocator,
@@ -164,7 +173,7 @@ test "hissylogz - dependencies trigger" {
 // ---
 // hissylogz.
 //
-// Copyright 2024 Kevin Poalses.
+// Copyright 2024,2025 Kevin Poalses.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 // The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
