@@ -1,14 +1,17 @@
 # hissylogz
 
-Structured logging support for Zig 0.15.1, enjoy, or my cat may hiss at you.
+Structured logging support for Zig 0.15.1, enjoy, or my cat may hiss at you. 😸
 
-I created a miniature logging framework to satisfy my immediate needs:
-- Simple, low ceremony logging
+This is a minimal logging framework to satisfy basic logging needs:
+
+- Log levels configurable at *runtime*, not compiled in
+- Simple, low ceremony, structured logging
 - Thread-safe, yet performant with efficient resource usage
 - Out-of-the-box log output friendly to cloud deployments (EKS, LOKI, etc) and log scrapers
+    - JSON output (machine friendly)
+    - Text output (human friendly)
 - [ULID](https://github.com/ulid/spec) (Universally Unique Lexicographically Sortable Identifiers) support
-    - `Ulid` type
-    - `Ulid` generator
+- Pluggable timestamp supplier (e.g. simulations)
 
 Non-goals:
 - Do everything (loading config from various sources, have rolling file appenders, etc)
@@ -21,10 +24,28 @@ These are early days, and the feature set may grow, bugs will be found and fixed
 
 ### Fetch the package
 
-Let zig fetch the package and integrate it into your `build.zig.zon` automagically:
+Let zig fetch the latest package and integrate it into your `build.zig.zon` automagically:
 
 ```shell
-zig fetch --save https://github.com/hissyfit-dev/hissylogz/archive/refs/tags/v0.1.2.tar.gz
+zig fetch --save https://github.com/hissyfit-dev/hissylogz/archive/refs/tags/v0.2.0.tar.gz
+```
+
+#### Package for Zig 0.15.x
+
+```shell
+zig fetch --save https://github.com/hissyfit-dev/hissylogz/archive/refs/tags/v0.2.0.tar.gz
+```
+
+#### Package for Zig 0.14.x
+
+```shell
+zig fetch --save https://github.com/hissyfit-dev/hissylogz/archive/refs/tags/v0.1.1.tar.gz
+```
+
+#### Package for Zig 0.13.x
+
+```shell
+zig fetch --save https://github.com/hissyfit-dev/hissylogz/archive/refs/tags/v0.0.12.tar.gz
 ```
 
 ### Integrate into your build
@@ -279,7 +300,7 @@ NONE!
 
 I drew inspiration for the logger/entry API from [`log.zig`](https://github.com/karlseguin/log.zig).
 
-I re-purposed bits lifted from [ulid-zig](https://github.com/rsepassi/ulid-zig) under 0BSD.
+I vendored in a few bits lifted from [ulid-zig](https://github.com/rsepassi/ulid-zig) under 0BSD.
 This is a solid library and comes with plenty of bells and whistles, a nice C ABI, the works.
 I've added known error sets, and a heavily trimmed down, restructured API.
 
