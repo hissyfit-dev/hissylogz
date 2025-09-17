@@ -79,7 +79,7 @@ pub fn deinit(self: *Self) void {
     defer self.entry_pools_mutex.unlock();
 
     for (self.level_filter_ordinal..@intFromEnum(LogLevel.none)) |idx| {
-        defer self.entry_pools[idx].deinit();
+        defer self.entry_pools[idx].deinit(self.allocator);
         for (self.entry_pools[idx].items) |log_entry| {
             defer self.allocator.destroy(log_entry);
             log_entry.deinit();
@@ -142,7 +142,7 @@ fn releaseEntry(self: *Self, entry: *LogEntry) void {
     defer self.entry_pools_mutex.unlock();
 
     var pool = &self.entry_pools[@intFromEnum(entry.level())];
-    pool.append(entry) catch |e| {
+    pool.append(self.allocator, entry) catch |e| {
         std_logger.err("Failed to release log entry: {any}", .{e});
         return;
     };
@@ -425,8 +425,11 @@ test "logger - smoke test" {
     std.debug.print("logger - smoke test\n", .{});
     const allocator = testing.allocator;
 
+    var stderr_buffer: [1024]u8 = undefined;
+    var stderr_writer = std.fs.File.stderr().writer(&stderr_buffer);
+    const stderr = &stderr_writer.interface;
     const output: LogOutput = .{
-        .writer = std.io.getStdErr().writer(),
+        .writer = stderr,
     };
     var mtx: std.Thread.Mutex = .{};
 
@@ -495,7 +498,7 @@ fn _tst_smoke_logger(logger: *Logger) !void {
 // ---
 // hissylogz.
 //
-// Copyright 2024 Kevin Poalses.
+// Copyright 2024,2025 Kevin Poalses.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 // The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.

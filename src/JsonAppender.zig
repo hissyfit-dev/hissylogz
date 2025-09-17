@@ -70,7 +70,7 @@ pub fn ctx(self: *Self, value: []const u8) void {
 pub fn src(self: *Self, value: std.builtin.SourceLocation) void {
     var w = self.log_buffer.writer();
     w.writeAll("\"@src\":") catch return;
-    std.json.stringify(.{ .file = value.file, .@"fn" = value.fn_name, .line = value.line }, .{}, w) catch return;
+    std.json.Stringify.value(.{ .file = value.file, .@"fn" = value.fn_name, .line = value.line }, .{}, w) catch return;
     w.writeByte(',') catch return;
 }
 
@@ -81,7 +81,7 @@ pub fn str(self: *Self, key: []const u8, opt_value: ?[]const u8) void {
     };
     var w = self.log_buffer.writer();
     w.print("\"{s}\":", .{key}) catch return;
-    std.json.encodeJsonString(value, .{}, w) catch return;
+    std.json.Stringify.value(value, .{}, w) catch return;
     w.writeByte(',') catch return;
 }
 
@@ -231,8 +231,8 @@ pub fn obj(self: *Self, key: []const u8, value: anytype) void {
 
     var w = self.log_buffer.writer();
     w.print("\"{s}\":", .{key}) catch return;
-    std.json.stringify(obj_val, .{}, w) catch {
-        w.print("{self}", .{key}) catch return;
+    std.json.Stringify.value(obj_val, .{}, w) catch {
+        w.print("{any}", .{key}) catch return;
     };
     w.writeByte(',') catch return;
 }
@@ -329,7 +329,7 @@ pub fn log(self: *Self) void {
     };
 }
 
-fn logTo(self: *Self, writer: anytype) AccessError!void {
+fn logTo(self: *Self, writer: *std.Io.Writer) AccessError!void {
     var out_buffer = self.log_buffer.contents();
     if (out_buffer.len == 0) {
         return;
@@ -340,7 +340,7 @@ fn logTo(self: *Self, writer: anytype) AccessError!void {
     defer self.output_mutex.unlock();
 
     // Write log entry
-    nosuspend writer.print("{{\"@ts\":\"{rfc3339}\",\"@lvl\":\"{s}\",\"@log\":\"{s}\",\"@tid\":\"{d}\",{s}}}\n", .{
+    nosuspend writer.print("{{\"@ts\":\"{f}\",\"@lvl\":\"{s}\",\"@log\":\"{s}\",\"@tid\":\"{d}\",{s}}}\n", .{
         self.log_time,
         @tagName(self.level),
         self.log_name,
@@ -351,6 +351,7 @@ fn logTo(self: *Self, writer: anytype) AccessError!void {
         std_logger.err("Access error writing log entry: {any}\n", .{e});
         return AccessError.AccessFailure;
     };
+    writer.flush() catch return AccessError.AccessFailure;
 }
 
 const JsonAppender = @This();
@@ -359,8 +360,12 @@ test "json appender - smoke test" {
     std.debug.print("json appender - smoke test\n", .{});
     const allocator = testing.allocator;
 
+    var stderr_buffer: [1024]u8 = undefined;
+    var stderr_writer = std.fs.File.stderr().writer(&stderr_buffer);
+    const stderr = &stderr_writer.interface;
+
     const appender_output: JsonAppender.Output = .{
-        .writer = std.io.getStdErr().writer(),
+        .writer = stderr,
     };
     var mtx: std.Thread.Mutex = .{};
 
@@ -373,7 +378,7 @@ test "json appender - smoke test" {
         LogTime.now(),
     );
     defer json_appender_extra1.deinit();
-    _ = try json_appender_extra1.log_buffer.write("ABCXYZ");
+    _ = try json_appender_extra1.log_buffer.buf_writer.writer.write("ABCXYZ");
 
     var json_appender_extra2 = try JsonAppender.init(
         allocator,
@@ -406,8 +411,7 @@ test "json appender - smoke test" {
     defer allocator.free(embedded);
     embedded[embedded.len - 1] = '}';
     json_appender.str("embedded_key", embedded);
-
-    try std.io.getStdErr().writer().writeByte('\t');
+    _ = try std.fs.File.stderr().write("\t");
     json_appender.log();
 }
 
@@ -415,8 +419,11 @@ test "json appender - binary" {
     std.debug.print("json appender - binary\n", .{});
     const allocator = testing.allocator;
 
+    var stderr_buffer: [1024]u8 = undefined;
+    var stderr_writer = std.fs.File.stderr().writer(&stderr_buffer);
+    const stderr = &stderr_writer.interface;
     const appender_output: JsonAppender.Output = .{
-        .writer = std.io.getStdErr().writer(),
+        .writer = stderr,
     };
     var mtx: std.Thread.Mutex = .{};
 
@@ -454,8 +461,11 @@ test "json appender - int" {
     std.debug.print("json appender - int\n", .{});
     const allocator = testing.allocator;
 
+    var stderr_buffer: [1024]u8 = undefined;
+    var stderr_writer = std.fs.File.stderr().writer(&stderr_buffer);
+    const stderr = &stderr_writer.interface;
     const appender_output: JsonAppender.Output = .{
-        .writer = std.io.getStdErr().writer(),
+        .writer = stderr,
     };
     var mtx: std.Thread.Mutex = .{};
 
@@ -489,8 +499,11 @@ test "json appender - intx" {
     std.debug.print("json appender - intx\n", .{});
     const allocator = testing.allocator;
 
+    var stderr_buffer: [1024]u8 = undefined;
+    var stderr_writer = std.fs.File.stderr().writer(&stderr_buffer);
+    const stderr = &stderr_writer.interface;
     const appender_output: JsonAppender.Output = .{
-        .writer = std.io.getStdErr().writer(),
+        .writer = stderr,
     };
     var mtx: std.Thread.Mutex = .{};
 
@@ -518,8 +531,11 @@ test "json appender - boolean" {
     std.debug.print("json appender - boolean\n", .{});
     const allocator = testing.allocator;
 
+    var stderr_buffer: [1024]u8 = undefined;
+    var stderr_writer = std.fs.File.stderr().writer(&stderr_buffer);
+    const stderr = &stderr_writer.interface;
     const appender_output: JsonAppender.Output = .{
-        .writer = std.io.getStdErr().writer(),
+        .writer = stderr,
     };
     var mtx: std.Thread.Mutex = .{};
 
@@ -547,8 +563,11 @@ test "json appender - float" {
     std.debug.print("json appender - float\n", .{});
     const allocator = testing.allocator;
 
+    var stderr_buffer: [1024]u8 = undefined;
+    var stderr_writer = std.fs.File.stderr().writer(&stderr_buffer);
+    const stderr = &stderr_writer.interface;
     const appender_output: JsonAppender.Output = .{
-        .writer = std.io.getStdErr().writer(),
+        .writer = stderr,
     };
     var mtx: std.Thread.Mutex = .{};
 
@@ -582,8 +601,11 @@ test "json appender - error" {
     std.debug.print("json appender - error\n", .{});
     const allocator = testing.allocator;
 
+    var stderr_buffer: [1024]u8 = undefined;
+    var stderr_writer = std.fs.File.stderr().writer(&stderr_buffer);
+    const stderr = &stderr_writer.interface;
     const appender_output: JsonAppender.Output = .{
-        .writer = std.io.getStdErr().writer(),
+        .writer = stderr,
     };
     var mtx: std.Thread.Mutex = .{};
 
@@ -608,8 +630,11 @@ test "json appender - ctx" {
     std.debug.print("json appender - ctx\n", .{});
     const allocator = testing.allocator;
 
+    var stderr_buffer: [1024]u8 = undefined;
+    var stderr_writer = std.fs.File.stderr().writer(&stderr_buffer);
+    const stderr = &stderr_writer.interface;
     const appender_output: JsonAppender.Output = .{
-        .writer = std.io.getStdErr().writer(),
+        .writer = stderr,
     };
     var mtx: std.Thread.Mutex = .{};
 
@@ -631,8 +656,11 @@ test "json appender - src" {
     std.debug.print("json appender - src\n", .{});
     const allocator = testing.allocator;
 
+    var stderr_buffer: [1024]u8 = undefined;
+    var stderr_writer = std.fs.File.stderr().writer(&stderr_buffer);
+    const stderr = &stderr_writer.interface;
     const appender_output: JsonAppender.Output = .{
-        .writer = std.io.getStdErr().writer(),
+        .writer = stderr,
     };
     var mtx: std.Thread.Mutex = .{};
 
@@ -655,8 +683,11 @@ test "json appender - obj" {
     std.debug.print("json appender - obj\n", .{});
     const allocator = testing.allocator;
 
+    var stderr_buffer: [1024]u8 = undefined;
+    var stderr_writer = std.fs.File.stderr().writer(&stderr_buffer);
+    const stderr = &stderr_writer.interface;
     const appender_output: JsonAppender.Output = .{
-        .writer = std.io.getStdErr().writer(),
+        .writer = stderr,
     };
     var mtx: std.Thread.Mutex = .{};
     var json_appender = try JsonAppender.init(
@@ -675,56 +706,53 @@ test "json appender - obj" {
     try expectLogPostfixFmt(&json_appender, "\"rats\":{{\"some\":\"some\",\"thing\":\"thing\"}}}}", .{});
 }
 
-// test "json appender - any" {
-//     std.debug.print("json appender - any\n", .{});
-//     const allocator = testing.allocator;
+test "json appender - any" {
+    std.debug.print("json appender - any\n", .{});
+    const allocator = testing.allocator;
 
-//     const appender_output: JsonAppender.Output = .{
-//         .writer = std.io.getStdErr().writer(),
-//     };
-//     var mtx: std.Thread.Mutex = .{};
-//     var json_appender = try JsonAppender.init(
-//         allocator,
-//         "json",
-//         appender_output,
-//         &mtx,
-//         .debug,
-//         LogTime.now(),
-//     );
-//     defer json_appender.deinit();
+    var stderr_buffer: [1024]u8 = undefined;
+    var stderr_writer = std.fs.File.stderr().writer(&stderr_buffer);
+    const stderr = &stderr_writer.interface;
+    const appender_output: JsonAppender.Output = .{
+        .writer = stderr,
+    };
+    var mtx: std.Thread.Mutex = .{};
+    var json_appender = try JsonAppender.init(
+        allocator,
+        "json",
+        appender_output,
+        &mtx,
+        .debug,
+        LogTime.now(),
+    );
+    defer json_appender.deinit();
 
-//     const rats = .{ .some = "some", .thing = "thing" };
+    const rats = .{ .some = "some", .thing = "thing" };
 
-//     json_appender.any("rats", rats);
-//     try expectLogPostfixFmt(&json_appender, "\"rats\":\"struct{{comptime some: *const [4:0]u8 = \"some\", comptime thing: *const [5:0]u8 = \"thing\"}}{{ .some = {{ 115, 111, 109, 101 }}, .thing = {{ 116, 104, 105, 110, 103 }} }}\"}}", .{});
-// }
+    json_appender.any("rats", rats);
+    try expectLogPostfixFmt(&json_appender, "\"rats\":\".{{ .some = {{ 115, 111, 109, 101 }}, .thing = {{ 116, 104, 105, 110, 103 }} }}\"}}", .{});
+}
 
 fn expectLogPostfix(json_appender: *JsonAppender, comptime expected: ?[]const u8) !void {
-    var out = std.ArrayList(u8).init(std.testing.allocator);
-    try out.ensureTotalCapacity(100);
-    defer out.deinit();
-
-    try json_appender.logTo(out.writer());
+    var out_buf: [512]u8 = undefined;
+    var out = std.Io.Writer.fixed(&out_buf);
+    try json_appender.logTo(&out);
     if (expected) |e| {
-        try std.testing.expectEqualStrings(e, extractPostfix(out.items));
+        try std.testing.expectEqualStrings(e, extractPostfix(out.buffered()));
     } else {
-        try std.testing.expectEqual(0, out.items.len);
+        try std.testing.expectEqual(0, out.buffered().len);
     }
     json_appender.reset(LogTime.now());
 }
 
 fn expectLogPostfixFmt(json_appender: *JsonAppender, comptime format: []const u8, args: anytype) !void {
-    defer json_appender.reset(LogTime.now());
-
-    var out = std.ArrayList(u8).init(std.testing.allocator);
-    try out.ensureTotalCapacity(100);
-    defer out.deinit();
-
-    try json_appender.logTo(out.writer());
+    var out_buf: [512]u8 = undefined;
+    var out = std.Io.Writer.fixed(&out_buf);
+    try json_appender.logTo(&out);
 
     var buf: [200]u8 = undefined;
     const expected = try std.fmt.bufPrint(&buf, format, args);
-    try std.testing.expectEqualStrings(expected, extractPostfix(out.items));
+    try std.testing.expectEqualStrings(expected, extractPostfix(out.buffered()));
     json_appender.reset(LogTime.now());
 }
 
@@ -743,7 +771,7 @@ fn extractPostfix(text: []const u8) []const u8 {
 // ---
 // hissylogz.
 //
-// Copyright 2024 Kevin Poalses.
+// Copyright 2024,2025 Kevin Poalses.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 // The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.

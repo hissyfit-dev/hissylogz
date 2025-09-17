@@ -103,7 +103,7 @@ pub fn str(self: *Self, key: []const u8, opt_value: ?[]const u8) void {
     };
     var w = self.log_buffer.writer();
     w.print("{s}=", .{key}) catch return;
-    std.json.encodeJsonString(value, .{}, w) catch return;
+    std.json.Stringify.encodeJsonString(value, .{}, w) catch return;
     w.writeAll(" ") catch return;
 }
 
@@ -341,7 +341,7 @@ pub fn log(self: *Self) void {
     };
 }
 
-fn logTo(self: *Self, writer: anytype) AccessError!void {
+fn logTo(self: *Self, writer: *std.Io.Writer) AccessError!void {
     var out_buffer = self.log_buffer.contents();
     if (out_buffer.len == 0) {
         return;
@@ -353,7 +353,7 @@ fn logTo(self: *Self, writer: anytype) AccessError!void {
 
     // Write log entry
     const tid = std.Thread.getCurrentId();
-    nosuspend writer.print("{rfc3339} {s: <5} [{s: <35} ({d:0>8})]: {s}\n", .{
+    nosuspend writer.print("{f} {s: <5} [{s: <35} ({d:0>8})]: {s}\n", .{
         self.log_time,
         log_level_names[@intFromEnum(self.level)],
         self.log_name,
@@ -364,6 +364,7 @@ fn logTo(self: *Self, writer: anytype) AccessError!void {
         std_logger.err("Access error writing log entry: {any}\n", .{e});
         return AccessError.AccessFailure;
     };
+    writer.flush() catch return AccessError.AccessFailure;
 }
 
 // This once-per-lifetime function should be invoked using `init_names_once.call()`
@@ -388,8 +389,11 @@ test "text appender - binary" {
     std.debug.print("text appender - binary\n", .{});
     const allocator = testing.allocator;
 
+    var stderr_buffer: [1024]u8 = undefined;
+    var stderr_writer = std.fs.File.stderr().writer(&stderr_buffer);
+    const stderr = &stderr_writer.interface;
     const appender_output: TextAppender.Output = .{
-        .writer = std.io.getStdErr().writer(),
+        .writer = stderr,
     };
     var mtx: std.Thread.Mutex = .{};
     var text_appender = try TextAppender.init(
@@ -426,8 +430,11 @@ test "text appender - int" {
     std.debug.print("text appender - int\n", .{});
     const allocator = testing.allocator;
 
+    var stderr_buffer: [1024]u8 = undefined;
+    var stderr_writer = std.fs.File.stderr().writer(&stderr_buffer);
+    const stderr = &stderr_writer.interface;
     const appender_output: TextAppender.Output = .{
-        .writer = std.io.getStdErr().writer(),
+        .writer = stderr,
     };
     var mtx: std.Thread.Mutex = .{};
     var text_appender = try TextAppender.init(
@@ -460,8 +467,11 @@ test "text appender - boolean" {
     std.debug.print("text appender - boolean\n", .{});
     const allocator = testing.allocator;
 
+    var stderr_buffer: [1024]u8 = undefined;
+    var stderr_writer = std.fs.File.stderr().writer(&stderr_buffer);
+    const stderr = &stderr_writer.interface;
     const appender_output: TextAppender.Output = .{
-        .writer = std.io.getStdErr().writer(),
+        .writer = stderr,
     };
     var mtx: std.Thread.Mutex = .{};
     var text_appender = try TextAppender.init(
@@ -488,8 +498,11 @@ test "text appender - float" {
     std.debug.print("text appender - float\n", .{});
     const allocator = testing.allocator;
 
+    var stderr_buffer: [1024]u8 = undefined;
+    var stderr_writer = std.fs.File.stderr().writer(&stderr_buffer);
+    const stderr = &stderr_writer.interface;
     const appender_output: TextAppender.Output = .{
-        .writer = std.io.getStdErr().writer(),
+        .writer = stderr,
     };
     var mtx: std.Thread.Mutex = .{};
     var text_appender = try TextAppender.init(
@@ -522,8 +535,11 @@ test "text appender - error" {
     std.debug.print("text appender - error\n", .{});
     const allocator = testing.allocator;
 
+    var stderr_buffer: [1024]u8 = undefined;
+    var stderr_writer = std.fs.File.stderr().writer(&stderr_buffer);
+    const stderr = &stderr_writer.interface;
     const appender_output: TextAppender.Output = .{
-        .writer = std.io.getStdErr().writer(),
+        .writer = stderr,
     };
     var mtx: std.Thread.Mutex = .{};
     var text_appender = try TextAppender.init(
@@ -547,8 +563,11 @@ test "text appender - ctx" {
     std.debug.print("text appender - ctx\n", .{});
     const allocator = testing.allocator;
 
+    var stderr_buffer: [1024]u8 = undefined;
+    var stderr_writer = std.fs.File.stderr().writer(&stderr_buffer);
+    const stderr = &stderr_writer.interface;
     const appender_output: TextAppender.Output = .{
-        .writer = std.io.getStdErr().writer(),
+        .writer = stderr,
     };
     var mtx: std.Thread.Mutex = .{};
     var text_appender = try TextAppender.init(
@@ -569,8 +588,11 @@ test "text appender - src" {
     std.debug.print("text appender - src\n", .{});
     const allocator = testing.allocator;
 
+    var stderr_buffer: [1024]u8 = undefined;
+    var stderr_writer = std.fs.File.stderr().writer(&stderr_buffer);
+    const stderr = &stderr_writer.interface;
     const appender_output: TextAppender.Output = .{
-        .writer = std.io.getStdErr().writer(),
+        .writer = stderr,
     };
     var mtx: std.Thread.Mutex = .{};
     var text_appender = try TextAppender.init(
@@ -588,57 +610,56 @@ test "text appender - src" {
     try expectLogPostfixFmt(&text_appender, "@src=\"TextAppender.zig:{d}: test.text appender - src\"", .{local_src.line});
 }
 
-// test "text appender - any" {
-//     std.debug.print("text appender - any\n", .{});
-//     const allocator = testing.allocator;
+test "text appender - any" {
+    std.debug.print("text appender - any\n", .{});
+    const allocator = testing.allocator;
 
-//     const appender_output: TextAppender.Output = .{
-//         .writer = std.io.getStdErr().writer(),
-//     };
-//     var mtx: std.Thread.Mutex = .{};
-//     var json_appender = try TextAppender.init(
-//         allocator,
-//         "text",
-//         appender_output,
-//         &mtx,
-//         .debug,
-//         LogTime.now(),
-//     );
-//     defer json_appender.deinit();
+    var stderr_buffer: [1024]u8 = undefined;
+    var stderr_writer = std.fs.File.stderr().writer(&stderr_buffer);
+    const stderr = &stderr_writer.interface;
+    const appender_output: TextAppender.Output = .{
+        .writer = stderr,
+    };
+    var mtx: std.Thread.Mutex = .{};
+    var text_appender = try TextAppender.init(
+        allocator,
+        "text",
+        appender_output,
+        &mtx,
+        .debug,
+        LogTime.now(),
+    );
+    defer text_appender.deinit();
 
-//     const rats = .{ .some = "some", .thing = "thing" };
+    const rats = .{ .some = "some", .thing = "thing" };
 
-//     json_appender.any("rats", rats);
-//     try expectLogPostfixFmt(&json_appender, "rats=struct{{comptime some: *const [4:0]u8 = \"some\", comptime thing: *const [5:0]u8 = \"thing\"}}{{ .some = {{ 115, 111, 109, 101 }}, .thing = {{ 116, 104, 105, 110, 103 }} }}", .{});
-// }
+    text_appender.any("rats", rats);
+    try expectLogPostfixFmt(&text_appender, "rats=.{{ .some = {{ 115, 111, 109, 101 }}, .thing = {{ 116, 104, 105, 110, 103 }} }}", .{});
+}
 
 fn expectLogPostfix(text_appender: *TextAppender, comptime expected: ?[]const u8) !void {
-    var out = std.ArrayList(u8).init(std.testing.allocator);
-    try out.ensureTotalCapacity(100);
-    defer out.deinit();
+    var out_buf: [512]u8 = undefined;
+    var out = std.Io.Writer.fixed(&out_buf);
 
-    try text_appender.logTo(out.writer());
+    try text_appender.logTo(&out);
     if (expected) |e| {
-        try std.testing.expectEqualStrings(e, extractPostfix(out.items));
+        try std.testing.expectEqualStrings(e, extractPostfix(out.buffered()));
     } else {
-        try std.testing.expectEqual(0, out.items.len);
+        try std.testing.expectEqual(0, out.buffered().len);
     }
     text_appender.reset(LogTime.now());
 }
 
 fn expectLogPostfixFmt(text_appender: *TextAppender, comptime format: []const u8, args: anytype) !void {
     defer text_appender.reset(LogTime.now());
+    var out_buf: [512]u8 = undefined;
+    var out = std.Io.Writer.fixed(&out_buf);
 
-    var out = std.ArrayList(u8).init(std.testing.allocator);
-    try out.ensureTotalCapacity(100);
-    defer out.deinit();
-
-    try text_appender.logTo(out.writer());
+    try text_appender.logTo(&out);
 
     var buf: [200]u8 = undefined;
     const expected = try std.fmt.bufPrint(&buf, format, args);
-    try std.testing.expectEqualStrings(expected, extractPostfix(out.items));
-    text_appender.reset(LogTime.now());
+    try std.testing.expectEqualStrings(expected, extractPostfix(out.buffered()));
 }
 
 fn extractPostfix(text: []const u8) []const u8 {
@@ -656,7 +677,7 @@ fn extractPostfix(text: []const u8) []const u8 {
 // ---
 // hissylogz.
 //
-// Copyright 2024 Kevin Poalses.
+// Copyright 2024,2025 Kevin Poalses.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 // The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
