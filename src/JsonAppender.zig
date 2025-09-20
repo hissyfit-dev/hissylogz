@@ -759,7 +759,7 @@ fn expectLogPostfixFmt(json_appender: *JsonAppender, comptime format: []const u8
 fn extractPostfix(text: []const u8) []const u8 {
     const ts_len: usize = 36;
     const level_len: usize = 10 + @tagName(default_logging_level).len;
-    const tid_len: usize = 18;
+    const tid_len: usize = comptime if (builtin.os.tag == .freebsd) 16 else 18;
     const name_len: usize = 14;
     const prefix_len: usize = 1 + ts_len + level_len + tid_len + name_len;
     if (text.len <= prefix_len) {
