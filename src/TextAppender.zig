@@ -242,8 +242,8 @@ pub fn obj(self: *Self, key: []const u8, value: anytype) void {
 
     var w = self.log_buffer.writer();
     w.print("{s}=", .{key}) catch return;
-    std.json.stringify(obj_val, .{}, w) catch {
-        w.print("{self}", .{key}) catch return;
+    std.json.Stringify.value(obj_val, .{}, w) catch {
+        w.print("{any}", .{obj_val}) catch return;
     };
     w.writeByte(' ') catch return;
 }
@@ -637,6 +637,33 @@ test "text appender - any" {
     try expectLogPostfixFmt(&text_appender, "rats=.{{ .some = {{ 115, 111, 109, 101 }}, .thing = {{ 116, 104, 105, 110, 103 }} }}", .{});
 }
 
+test "text appender - obj" {
+    std.debug.print("text appender - obj\n", .{});
+    const allocator = testing.allocator;
+
+    var stderr_buffer: [1024]u8 = undefined;
+    var stderr_writer = std.fs.File.stderr().writer(&stderr_buffer);
+    const stderr = &stderr_writer.interface;
+    const appender_output: TextAppender.Output = .{
+        .writer = stderr,
+    };
+    var mtx: std.Thread.Mutex = .{};
+    var text_appender = try TextAppender.init(
+        allocator,
+        "text",
+        appender_output,
+        &mtx,
+        .debug,
+        LogTime.now(),
+    );
+    defer text_appender.deinit();
+
+    const bats = .{ .ugly = "ugly", .creature = "creature" };
+
+    text_appender.obj("bats", bats);
+    try expectLogPostfixFmt(&text_appender, "bats={{\"ugly\":\"ugly\",\"creature\":\"creature\"}}", .{});
+}
+
 fn expectLogPostfix(text_appender: *TextAppender, comptime expected: ?[]const u8) !void {
     var out_buf: [512]u8 = undefined;
     var out = std.Io.Writer.fixed(&out_buf);
@@ -665,7 +692,7 @@ fn expectLogPostfixFmt(text_appender: *TextAppender, comptime format: []const u8
 fn extractPostfix(text: []const u8) []const u8 {
     const ts_len = 42;
     const level_len = @tagName(default_logging_level).len;
-    const tid_len = 8;
+    const tid_len: usize = 8;
     const name_len = 20 + 3;
     const prefix_len = ts_len + 1 + level_len + 2 + tid_len + name_len + 2 + 1;
     if (text.len <= prefix_len) {
