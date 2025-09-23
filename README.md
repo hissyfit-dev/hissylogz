@@ -27,13 +27,13 @@ These are early days, and the feature set may grow, bugs will be found and fixed
 Let zig fetch the latest package and integrate it into your `build.zig.zon` automagically:
 
 ```shell
-zig fetch --save https://github.com/hissyfit-dev/hissylogz/archive/refs/tags/v0.2.1.tar.gz
+zig fetch --save https://github.com/hissyfit-dev/hissylogz/archive/refs/tags/v0.2.2.tar.gz
 ```
 
 #### Package for Zig 0.15.x
 
 ```shell
-zig fetch --save https://github.com/hissyfit-dev/hissylogz/archive/refs/tags/v0.2.1.tar.gz
+zig fetch --save https://github.com/hissyfit-dev/hissylogz/archive/refs/tags/v0.2.2.tar.gz
 ```
 
 #### Package for Zig 0.14.x
