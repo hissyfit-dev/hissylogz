@@ -105,12 +105,12 @@ pub fn strZ(self: *Self, key: []const u8, opt_value: ?[*:0]const u8) void {
 }
 
 pub fn ulid(self: *Self, key: []const u8, opt_value: ?Ulid) void {
-    if (opt_value == null) {
+    if (opt_value) |_val| {
+        var w = self.log_buffer.writer();
+        w.print("\"{s}\":\"{f}\",", .{ key, _val }) catch return;
+    } else {
         self.writeNull(key);
-        return;
     }
-    var w = self.log_buffer.writer();
-    w.print("\"{s}\":\"{any}\",", .{ key, opt_value }) catch return;
 }
 
 pub fn int(self: *Self, key: []const u8, value: anytype) void {
@@ -762,8 +762,8 @@ fn extractPostfix(text: []const u8) []const u8 {
     const tid_len: usize = comptime switch (builtin.os.tag) {
         .freebsd => 16,
         .linux => 14,
-        .macos => 17,
-        else => 17,
+        .macos => 18,
+        else => @compileError("Need TID len for OS"),
     };
     const name_len: usize = 14;
     const prefix_len: usize = 1 + ts_len + level_len + tid_len + name_len;
