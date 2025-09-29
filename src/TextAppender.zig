@@ -116,12 +116,12 @@ pub fn strZ(self: *Self, key: []const u8, opt_value: ?[*:0]const u8) void {
 }
 
 pub fn ulid(self: *Self, key: []const u8, opt_value: ?Ulid) void {
-    if (opt_value == null) {
+    if (opt_value) |_val| {
+        var w = self.log_buffer.writer();
+        w.print("{s}=\"{f}\" ", .{ key, _val }) catch return;
+    } else {
         self.writeNull(key);
-        return;
     }
-    var w = self.log_buffer.writer();
-    w.print("{s}=\"{any}\" ", .{ key, opt_value }) catch return;
 }
 
 pub fn int(self: *Self, key: []const u8, value: anytype) void {

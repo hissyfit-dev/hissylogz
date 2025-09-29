@@ -1,4 +1,6 @@
 //! ULID implementation.
+//!
+//! Vendored portion of https://github.com/rsepassi/ulid-zig
 
 const std = @import("std");
 
@@ -88,9 +90,7 @@ pub const Ulid = packed struct {
         return s == o;
     }
 
-    pub fn format(value: Self, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
-        _ = fmt;
-        _ = options;
+    pub fn format(value: Self, writer: *std.Io.Writer) !void {
         _ = try writer.write(&value.encode());
     }
 };

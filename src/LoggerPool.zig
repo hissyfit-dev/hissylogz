@@ -110,10 +110,7 @@ fn fetchOrAdd(self: *Self, name: []const u8) AllocationError!*Logger {
 }
 
 fn fetchExisting(self: *Self, name: []const u8) ?*Logger {
-    var existing = self.loggers.get(name);
-    _ = &existing;
-
-    return existing;
+    return self.loggers.get(name);
 }
 
 const LogOutput = constants.LogOutput;
