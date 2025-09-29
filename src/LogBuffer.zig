@@ -13,16 +13,12 @@ const LogBuffer = @This();
 
 const initial_logging_buffer_size = @import("limits.zig").default_initial_logging_buffer_size;
 
-const BufferArray = std.ArrayList(u8);
-
-allocator: std.mem.Allocator,
 buf_writer: std.Io.Writer.Allocating,
 
 pub fn init(allocator: std.mem.Allocator) AllocationError!Self {
     var buf_writer = std.Io.Writer.Allocating.initCapacity(allocator, initial_logging_buffer_size) catch return AllocationError.OutOfMemory;
     errdefer buf_writer.deinit();
     return .{
-        .allocator = allocator,
         .buf_writer = buf_writer,
     };
 }
